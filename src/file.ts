@@ -15,7 +15,10 @@ export async function save(fileName: string, data: unknown): Promise<void> {
     URL.revokeObjectURL(url);
   } else {
     const file = new File(Paths.cache, fileName);
-    await file.create();
+    if (file.exists) {
+      await file.delete();
+    }
+    // @ts-ignore - workaround for expo-file-system bug where options param is required but breaks functionality
     await file.write(content);
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(file.uri, {
@@ -26,7 +29,7 @@ export async function save(fileName: string, data: unknown): Promise<void> {
   }
 }
 
-export async function open(): Promise<unknown> {
+export async function open(): Promise<{ data: unknown; filename: string }> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "application/json",
     multiple: false,
@@ -52,7 +55,8 @@ export async function open(): Promise<unknown> {
   const fileContent = await response.text();
 
   try {
-    return JSON.parse(fileContent);
+    const data = JSON.parse(fileContent);
+    return { data, filename: file.name };
   } catch (error) {
     throw new Error("Invalid JSON format in file");
   }

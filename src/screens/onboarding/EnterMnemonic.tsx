@@ -1,5 +1,11 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TextInput, Dimensions } from "react-native";
+import React, { useState, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useStore } from "@/Store";
 import { validateMnemonic, xprvFromMnemonic, xpubFromXprv } from "@/keys";
@@ -19,6 +25,7 @@ export default function ({ navigation, route }: Props) {
   const { setupKeystore } = useStore();
   const [inputWords, setInputWords] = useState<string[]>(Array(12).fill(""));
   const [error, setError] = useState<ValidationError>(null);
+  const inputRefs = useRef<(TextInput | null)[]>(Array(12).fill(null));
 
   const handleWordChange = (index: number, value: string) => {
     const newWords = [...inputWords];
@@ -88,9 +95,16 @@ export default function ({ navigation, route }: Props) {
 
       <View style={styles.inputContainer}>
         {inputWords.map((word, index) => (
-          <View key={index} style={styles.wordInputContainer}>
+          <TouchableOpacity
+            key={index}
+            style={styles.wordInputContainer}
+            onPress={() => inputRefs.current[index]?.focus()}
+          >
             <Text style={styles.wordInputNumber}>{index + 1}.</Text>
             <TextInput
+              ref={(ref) => {
+                inputRefs.current[index] = ref;
+              }}
               style={styles.wordInput}
               value={word}
               onChangeText={(value) => handleWordChange(index, value)}
@@ -101,7 +115,7 @@ export default function ({ navigation, route }: Props) {
               autoCorrect={false}
               autoComplete="off"
             />
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
 
@@ -110,25 +124,24 @@ export default function ({ navigation, route }: Props) {
   );
 }
 
-const { width } = Dimensions.get("window");
-
 const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12,
     marginTop: 20,
     marginBottom: 30,
   },
   wordInputContainer: {
-    width: (width - 60) / 3 - 8,
+    width: "48%",
     backgroundColor: "#1A1A1A",
     borderRadius: 8,
     padding: 12,
+    marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    minWidth: 0,
   },
   wordInputNumber: {
     fontSize: 14,
@@ -143,6 +156,7 @@ const styles = StyleSheet.create({
     padding: 0,
     margin: 0,
     textAlign: "left",
+    minWidth: 0,
     // @ts-ignore - web-only style to remove focus outline
     outlineStyle: "none",
   } as any,
