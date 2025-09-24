@@ -1,0 +1,38 @@
+{
+  "name": "nacho",
+  "version": "0.0.1",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prettier": "prettier -w ."
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/native": "^7.1.14",
+    "@react-navigation/native-stack": "^7.3.21",
+    "@scure/bip32": "^1.7.0",
+    "@scure/bip39": "^1.6.0",
+    "@undecaf/barcode-detector-polyfill": "^0.9.23",
+    "@undecaf/zbar-wasm": "^0.9.16",
+    "buffer": "^6.0.3",
+    "expo": "^54.0.8",
+    "expo-camera": "~17.0.8",
+    "expo-document-picker": "~14.0.7",
+    "expo-secure-store": "~15.0.7",
+    "expo-sharing": "^14.0.7",
+    "react": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-svg": "15.12.1",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.1.10",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
