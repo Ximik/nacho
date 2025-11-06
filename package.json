@@ -4,7 +4,9 @@
   "scripts": {
     "start": "expo start",
     "doctor": "expo-doctor",
-    "pretty": "prettier -w ."
+    "pretty": "prettier -w .",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -17,14 +19,14 @@
     "@scure/bip39": "^1.6.0",
     "@undecaf/zbar-wasm": "^0.9.16",
     "buffer": "^6.0.3",
-    "expo": "54.0.22",
-    "expo-camera": "~17.0.9",
-    "expo-crypto": "^15.0.7",
-    "expo-dev-client": "~6.0.17",
-    "expo-document-picker": "~14.0.7",
+    "expo": "~54.0.29",
+    "expo-camera": "~17.0.10",
+    "expo-crypto": "~15.0.8",
+    "expo-document-picker": "~14.0.8",
     "expo-file-system": "^19.0.16",
-    "expo-secure-store": "~15.0.7",
-    "expo-sharing": "^14.0.7",
+    "expo-iap": "^3.3.0-rc.4",
+    "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -41,5 +43,6 @@
     "prettier": "^3.6.2",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "version": "1.0.0"
 }

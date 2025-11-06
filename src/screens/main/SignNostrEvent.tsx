@@ -20,7 +20,7 @@ import { save } from "@/file";
 type Props = NativeStackScreenProps<HandlesStackParamList, "SignNostrEvent">;
 
 export default function SignNostrEvent({ navigation, route }: Props) {
-  const { handle } = route.params;
+  const { network, handle } = route.params;
   const { handles, getXprv } = useStore();
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [nostrEvent, setNostrEvent] = useState<NostrEventData | null>(null);
@@ -61,7 +61,7 @@ export default function SignNostrEvent({ navigation, route }: Props) {
       setIsSigningInProgress(true);
       setValidationError(null);
 
-      const handleData = handles[handle];
+      const handleData = handles?.[network]?.[handle];
       if (!handleData) {
         throw new Error(`Handle ${handle} not found`);
       }

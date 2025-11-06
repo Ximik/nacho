@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
@@ -10,6 +11,14 @@ import { save } from "@/file";
 import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
 import { Button } from "@/ui/Button";
+import { Message } from "@/ui/Message";
+import {
+  fetchHandleStatus,
+  reserveHandle,
+  claimHandleIAP,
+  HandleStatus,
+} from "@/api";
+import { extractCertData } from "@/cert";
 
 type ShowHandleRouteProp = RouteProp<HandlesStackParamList, "ShowHandle">;
 type ShowHandleNavigationProp = NativeStackNavigationProp<
@@ -22,30 +31,151 @@ interface Props {
   navigation: ShowHandleNavigationProp;
 }
 
+type IAPHook = (typeof import("expo-iap"))["useIAP"];
+const iap = (() => {
+  switch (Platform.OS) {
+    case "android":
+    case "ios":
+      try {
+        const hook = require("expo-iap").useIAP as IAPHook;
+        return {
+          platform:
+            Platform.OS === "android"
+              ? ("google_iap" as const)
+              : ("apple_iap" as const),
+          hook,
+        };
+      } catch (error) {
+        console.error("expo-iap not available");
+        return null;
+      }
+    default:
+      return null;
+  }
+})();
+
 export default function ShowHandle({ route, navigation }: Props) {
-  const { handle } = route.params;
-  const { xpub, handles, removeHandle } = useStore();
+  const { network, handle } = route.params;
+  const { xpub, handles, removeHandle, setHandleCertData } = useStore();
+  const [error, setError] = useState<string | null>(null);
+  const [handleStatusString, setHandleStatusString] = useState<
+    HandleStatus["status"] | null
+  >(null);
+  const [isScriptPubkeyValid, setIsScriptPubkeyValid] = useState<
+    boolean | null
+  >(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
-  const handleData = handles?.[handle];
+  const handleData = handles?.[network]?.[handle];
 
   if (!xpub || !handleData) {
-    return (
-      <Layout>
-        <View style={styles.notFoundContainer}>
-          <Text style={styles.notFoundText}>Handle not found</Text>
-        </View>
-      </Layout>
-    );
+    navigation.replace("ListHandles", { network });
+    return null;
   }
 
   const pubkey = pubFromPath(xpub, handleData.path);
   const script_pubkey = p2trScriptFromPub(pubkey);
 
+  const { requestPurchase, finishTransaction } =
+    iap && network === "mainnet"
+      ? iap.hook({
+          onPurchaseSuccess: async (purchase) => {
+            if (!purchase.purchaseToken) {
+              setError("No purchase token received");
+              return;
+            }
+            const result = await claimHandleIAP(
+              network,
+              handle,
+              script_pubkey,
+              purchase.purchaseToken,
+              iap.platform,
+            );
+            if (result.error) {
+              setError(result.error);
+              fetchAndUpdateHandleStatus();
+            } else {
+              await applyHandleStatus(result.handle_status);
+              if (result.handle_status.status === "taken") {
+                await finishTransaction({
+                  purchase,
+                  isConsumable: true,
+                });
+              }
+            }
+          },
+          onPurchaseError: (error) => {
+            if (error.code !== "user-cancelled") {
+              setError("Purchase failed: " + error.message);
+            }
+          },
+        })
+      : ({
+          requestPurchase: async () => {
+            const result = await claimHandleIAP(
+              network,
+              handle,
+              script_pubkey,
+              `test_valid_purchase_${Date.now().toString()}${Math.random().toString(36).slice(1)}`,
+              "test",
+            );
+            if (result.error) {
+              setError(result.error);
+              fetchAndUpdateHandleStatus();
+            } else {
+              await applyHandleStatus(result.handle_status);
+            }
+            return null;
+          },
+          finishTransaction: async () => {},
+        } as Pick<
+          ReturnType<IAPHook>,
+          "requestPurchase" | "finishTransaction"
+        >);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAndUpdateHandleStatus();
+    }, []),
+  );
+
+  useEffect(() => {
+    if (
+      handleStatusString === "reserved" ||
+      handleStatusString === "processing_payment"
+    ) {
+      const interval = setInterval(() => {
+        fetchAndUpdateHandleStatus();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [handleStatusString]);
+
+  const fetchAndUpdateHandleStatus = async () => {
+    const status = await fetchHandleStatus(network, handle);
+    await applyHandleStatus(status);
+  };
+
+  const applyHandleStatus = async (status: HandleStatus) => {
+    setHandleStatusString(status.status);
+    if ("script_pubkey" in status) {
+      if (status.script_pubkey === script_pubkey) {
+        setIsScriptPubkeyValid(true);
+        if ("certificate" in status) {
+          const certData = extractCertData(status.certificate);
+          await setHandleCertData(network, handle, certData);
+        }
+      } else {
+        setIsScriptPubkeyValid(false);
+      }
+    } else {
+      setIsScriptPubkeyValid(null);
+    }
+  };
+
   const handleRemoveHandle = () => {
-    removeHandle(handle);
-    setShowRemoveConfirm(false);
-    navigation.replace("ListHandles");
+    removeHandle(network, handle);
+    navigation.replace("ListHandles", { network });
   };
 
   const handleDownloadCertificate = async () => {
@@ -53,7 +183,6 @@ export default function ShowHandle({ route, navigation }: Props) {
     if (!certData) {
       return;
     }
-
     await save(
       `${handle}.cert.json`,
       buildCert(certData, handle, script_pubkey),
@@ -67,81 +196,188 @@ export default function ShowHandle({ route, navigation }: Props) {
     });
   };
 
-  const renderHandleName = (name: string) => {
-    const parts = name.split("@");
-    if (parts.length === 2) {
-      return (
-        <>
-          <Text style={styles.handleSubPart}>{parts[0]}</Text>
-          <Text style={styles.handleSpacePart}>@{parts[1]}</Text>
-        </>
-      );
+  const handleBuyHandle = async () => {
+    setError(null);
+    setHandleStatusString("reserved");
+    const result = await reserveHandle(network, handle, script_pubkey);
+    if ("error" in result) {
+      setError(result.error);
+      fetchAndUpdateHandleStatus();
+      return;
     }
-    return <Text style={styles.handleSpacePart}>{name}</Text>;
+
+    try {
+      await requestPurchase({
+        request: {
+          ios: { sku: result.product_id },
+          android: { skus: [result.product_id] },
+        },
+        type: "in-app",
+      });
+    } catch (error) {
+      setError(
+        "Failed purchase: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+      fetchAndUpdateHandleStatus();
+    }
   };
 
   return (
     <Layout
       overlay={showRemoveConfirm}
       footer={
-        handleData.cert ? (
-          <>
-            <Button
-              text="Sign Nostr Event"
-              onPress={() => navigation.navigate("SignNostrEvent", { handle })}
-              type="main"
+        showRemoveConfirm ? (
+          <View style={styles.confirmSection}>
+            <Header
+              headText="Remove"
+              tailText="Handle?"
+              subText="Are you sure you want to remove this handle?"
             />
-            <Button
-              text="Download Certificate"
-              onPress={handleDownloadCertificate}
-              type="secondary"
-            />
-          </>
+            <View style={styles.confirmButtons}>
+              <Button
+                text="Remove Handle"
+                onPress={handleRemoveHandle}
+                type="danger"
+              />
+              <Button
+                text="Cancel"
+                onPress={() => setShowRemoveConfirm(false)}
+                type="secondary"
+              />
+            </View>
+          </View>
         ) : (
-          <>
-            {!showRemoveConfirm ? (
-              <>
-                <Button
-                  text="Download Request"
-                  onPress={handleDownloadRequest}
-                  type="main"
-                />
+          (handleStatusString !== null || handleData.cert) && (
+            <>
+              {(() => {
+                if (handleData.cert) {
+                  return (
+                    <>
+                      <Button
+                        text="Sign Nostr Event"
+                        onPress={() =>
+                          navigation.navigate("SignNostrEvent", {
+                            network,
+                            handle,
+                          })
+                        }
+                        type="main"
+                      />
+                      <Button
+                        text="Download Certificate"
+                        onPress={handleDownloadCertificate}
+                        type="secondary"
+                      />
+                    </>
+                  );
+                }
+
+                if (handleStatusString === "unknown") {
+                  return (
+                    <Button
+                      text="Download Request"
+                      onPress={handleDownloadRequest}
+                      type="main"
+                    />
+                  );
+                }
+
+                const isProcessingPurchase =
+                  isScriptPubkeyValid === true &&
+                  (handleStatusString === "reserved" ||
+                    handleStatusString === "processing_payment");
+
+                return (
+                  <>
+                    {(isProcessingPurchase ||
+                      handleStatusString === "available") && (
+                      <Button
+                        text={
+                          isProcessingPurchase
+                            ? "Processing..."
+                            : network === "testnet4"
+                              ? "Claim Handle"
+                              : "Buy Handle"
+                        }
+                        onPress={handleBuyHandle}
+                        type="main"
+                        disabled={isProcessingPurchase}
+                      />
+                    )}
+                    {handleStatusString === "available" && (
+                      <Button
+                        text="Download Request"
+                        onPress={handleDownloadRequest}
+                        type="secondary"
+                      />
+                    )}
+                  </>
+                );
+              })()}
+              {(isScriptPubkeyValid === false ||
+                handleStatusString === "available" ||
+                handleStatusString === "preallocated" ||
+                handleStatusString === "invalid" ||
+                handleStatusString === "unknown") && (
                 <Button
                   text="Remove Handle"
                   onPress={() => setShowRemoveConfirm(true)}
                   type="danger"
                 />
-              </>
-            ) : (
-              <View style={styles.confirmSection}>
-                <Header
-                  headText="Remove"
-                  tailText="Handle?"
-                  subText="Are you sure you want to remove this handle?"
-                />
-                <View style={styles.confirmButtons}>
-                  <Button
-                    text="Remove Handle"
-                    onPress={handleRemoveHandle}
-                    type="danger"
-                  />
-                  <Button
-                    text="Cancel"
-                    onPress={() => setShowRemoveConfirm(false)}
-                    type="secondary"
-                  />
-                </View>
-              </View>
-            )}
-          </>
+              )}
+            </>
+          )
         )
       }
     >
-      <Text style={styles.title}>{renderHandleName(handle)}</Text>
+      <Text style={styles.title}>
+        {(() => {
+          const parts = handle.split("@");
+          if (parts.length === 2) {
+            return (
+              <>
+                <Text style={styles.handleSubPart}>{parts[0]}</Text>
+                <Text style={styles.handleSpacePart}>@{parts[1]}</Text>
+              </>
+            );
+          }
+          return <Text style={styles.handleSpacePart}>{handle}</Text>;
+        })()}
+      </Text>
+
+      {(() => {
+        if (error) {
+          return <Message message={error} type="error" />;
+        }
+
+        if (isScriptPubkeyValid === false) {
+          const message =
+            handleStatusString === "taken"
+              ? "Handle is taken, but it associated with a different public key."
+              : "Handle is currently reserved by another user.";
+          return <Message message={message} type="error" />;
+        }
+
+        if (
+          handleStatusString === "taken" &&
+          isScriptPubkeyValid === true &&
+          handleData.cert === undefined
+        ) {
+          return (
+            <Message
+              message="Handle successfully claimed. Certificate is being generated."
+              type="success"
+            />
+          );
+        }
+
+        return null;
+      })()}
 
       <View style={styles.section}>
         <Text style={styles.label}>Public Key</Text>
-        <Text style={styles.value} numberOfLines={6}>
+        <Text style={styles.value} numberOfLines={6} textBreakStrategy="simple">
           {pubkey}
         </Text>
       </View>
@@ -149,7 +385,11 @@ export default function ShowHandle({ route, navigation }: Props) {
       {handleData.cert && (
         <View style={styles.section}>
           <Text style={styles.label}>Proof</Text>
-          <Text style={styles.value} numberOfLines={10}>
+          <Text
+            style={styles.value}
+            numberOfLines={10}
+            textBreakStrategy="simple"
+          >
             {handleData.cert.witness.data}
           </Text>
         </View>
@@ -159,15 +399,6 @@ export default function ShowHandle({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  notFoundContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notFoundText: {
-    fontSize: 18,
-    color: "#D6D6D6",
-  },
   title: {
     fontSize: 28,
     fontWeight: "400",
@@ -197,7 +428,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     fontFamily: "monospace",
     lineHeight: 20,
-  },
+    // @ts-ignore - web-specific styles for word breaking
+    wordBreak: "break-all",
+    overflowWrap: "break-word",
+  } as any,
   confirmSection: {
     backgroundColor: "#1A1A1A",
     padding: 20,

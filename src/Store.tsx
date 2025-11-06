@@ -8,7 +8,7 @@ import React, {
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { CertData, isCertData } from "@/cert";
+import { CertData, isCertData, areCertDataEqual } from "@/cert";
 import { xpubFromXprv } from "@/keys";
 
 const getSecureStorage = () => {
@@ -67,7 +67,10 @@ function isHandleData(obj: unknown): obj is HandleData {
     return false;
   }
   const handle = obj as Record<string, unknown>;
-  if (typeof handle.path !== "string") {
+  if (
+    typeof handle.path !== "string" ||
+    !/^m(\/(?:0|[1-9]\d*))+$/.test(handle.path)
+  ) {
     return false;
   }
   if (handle.cert !== undefined && !isCertData(handle.cert)) {
@@ -76,14 +79,25 @@ function isHandleData(obj: unknown): obj is HandleData {
   return true;
 }
 
-export type Handles = Record<string, HandleData>;
+export type Network = "testnet4" | "mainnet";
 
-export type KeystoreData = {
+function isNetwork(s: unknown): s is Network {
+  return s === "testnet4" || s === "mainnet";
+}
+
+function getDerivationPrefix(network: Network): string {
+  return network === "mainnet" ? "m/35053/0/0/" : "m/35053/1/0/";
+}
+
+export type HandlesMap = Record<string, HandleData>;
+export type Handles = Partial<Record<Network, HandlesMap>>;
+
+export type Keystore = {
   xpub: string;
   handles: Handles;
 };
 
-export function isKeystoreData(obj: unknown): obj is KeystoreData {
+export function isKeystore(obj: unknown): obj is Keystore {
   if (!obj || typeof obj !== "object") {
     return false;
   }
@@ -94,9 +108,21 @@ export function isKeystoreData(obj: unknown): obj is KeystoreData {
   if (!keystore.handles || typeof keystore.handles !== "object") {
     return false;
   }
-  for (const value of Object.values(keystore.handles)) {
-    if (!isHandleData(value)) {
+  const handles = keystore.handles as Record<string, unknown>;
+  for (const network of Object.keys(handles)) {
+    if (!isNetwork(network)) {
       return false;
+    }
+    const handlesMap = handles[network];
+    if (!handlesMap || typeof handlesMap !== "object") {
+      return false;
+    }
+    for (const handleData of Object.values(
+      handlesMap as Record<string, unknown>,
+    )) {
+      if (!isHandleData(handleData)) {
+        return false;
+      }
     }
   }
   return true;
@@ -107,9 +133,13 @@ type StoreContextType = {
   handles: Handles | null;
   getXprv: () => Promise<string | null>;
   setupKeystore: (xprv: string, handles: Handles) => Promise<void>;
-  createHandle: (handle: string, cert?: string) => Promise<void>;
-  removeHandle: (handle: string) => Promise<void>;
-  setHandleCertData: (handle: string, cert: CertData | null) => Promise<void>;
+  createHandle: (network: Network, handle: string) => Promise<void>;
+  removeHandle: (network: Network, handle: string) => Promise<void>;
+  setHandleCertData: (
+    network: Network,
+    handle: string,
+    cert: CertData | null,
+  ) => Promise<void>;
 };
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -128,7 +158,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       const keystoreJson = await AsyncStorage.getItem("keystore");
       if (keystoreJson) {
         const keystore = JSON.parse(keystoreJson);
-        if (isKeystoreData(keystore)) {
+        if (isKeystore(keystore)) {
           setXpub(keystore.xpub);
           setHandles(keystore.handles);
         }
@@ -159,7 +189,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Cannot save keystore without handles");
     }
 
-    const keystore: KeystoreData = { xpub: xpubValue, handles: handlesValue };
+    const keystore: Keystore = { xpub: xpubValue, handles: handlesValue };
     await AsyncStorage.setItem("keystore", JSON.stringify(keystore));
   };
 
@@ -169,68 +199,89 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
   const setupKeystore = async (
     xprv: string,
-    handles: KeystoreData["handles"],
+    handles: Handles,
   ): Promise<void> => {
     await secureStorage.setXprv(xprv);
     await saveKeystore(handles, xpubFromXprv(xprv));
   };
 
-  const createHandle = async (handle: string): Promise<void> => {
+  const createHandle = async (
+    network: Network,
+    handle: string,
+  ): Promise<void> => {
     if (handles === null) {
       throw new Error("Cannot create handle without handles");
     }
-
-    if (handle in handles) {
+    const handlesMap = handles[network] || {};
+    if (handle in handlesMap) {
       return;
     }
 
-    let maxIndex = -1;
+    const prefix = getDerivationPrefix(network);
 
-    for (const handleData of Object.values(handles)) {
-      const match = handleData.path.match(/^m\/35053\/0\/0\/(\d+)$/);
-      if (match) {
-        const index = parseInt(match[1], 10);
-        if (index > maxIndex) {
+    let maxIndex = -1;
+    for (const handleData of Object.values(handlesMap)) {
+      if (handleData.path.startsWith(prefix)) {
+        const indexStr = handleData.path.slice(prefix.length);
+        const index = parseInt(indexStr, 10);
+        if (
+          !isNaN(index) &&
+          index.toString() === indexStr &&
+          index > maxIndex
+        ) {
           maxIndex = index;
         }
       }
     }
 
-    const nextIndex = maxIndex + 1;
-    const path = `m/35053/0/0/${nextIndex}`;
+    const path = prefix + (maxIndex + 1).toString();
 
     await saveKeystore({
       ...handles,
-      [handle]: {
-        path,
+      [network]: {
+        ...handlesMap,
+        [handle]: {
+          path,
+        },
       },
     });
   };
 
-  const removeHandle = async (handle: string): Promise<void> => {
+  const removeHandle = async (
+    network: Network,
+    handle: string,
+  ): Promise<void> => {
     if (handles === null) {
       throw new Error("Cannot remove handle without handles");
     }
-
-    if (!(handle in handles)) {
+    const handlesMap = handles[network] || {};
+    if (!(handle in handlesMap)) {
       return;
     }
 
-    const { [handle]: removed, ...remainingHandles } = handles;
+    const { [handle]: removed, ...remainingHandles } = handlesMap;
 
-    await saveKeystore(remainingHandles);
+    await saveKeystore({
+      ...handles,
+      [network]: remainingHandles,
+    });
   };
 
   const setHandleCertData = async (
+    network: Network,
     handle: string,
     cert: CertData | null,
   ): Promise<void> => {
     if (handles === null) {
       throw new Error("Cannot create handle without handles");
     }
-
-    const handleData = handles[handle];
+    const handlesMap = handles[network] || {};
+    const handleData = handlesMap[handle];
     if (handleData === undefined) {
+      return;
+    }
+
+    if (handleData.cert && cert && areCertDataEqual(handleData.cert, cert)) {
       return;
     }
 
@@ -244,7 +295,10 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
     const updatedHandles = {
       ...handles,
-      [handle]: updatedHandleData,
+      [network]: {
+        ...handlesMap,
+        [handle]: updatedHandleData,
+      },
     };
 
     await saveKeystore(updatedHandles);

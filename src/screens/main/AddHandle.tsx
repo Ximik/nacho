@@ -8,6 +8,7 @@ import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
+import { fetchHandleStatus } from "@/api";
 
 type AddHandleNavigationProp = NativeStackNavigationProp<
   HandlesStackParamList,
@@ -21,12 +22,14 @@ interface Props {
   route: AddHandleRouteProp;
 }
 
-type AddHandleError = "handleExists" | null;
+type AddHandleError = "handleExists" | "handleTaken" | "handleInvalid" | null;
 
-export default function ({ navigation, route }: Props) {
-  const [handle, setHandle] = useState(route.params?.initialHandle || "");
+export default function ({ route, navigation }: Props) {
+  const { network, initialHandle } = route.params;
+  const [handle, setHandle] = useState(initialHandle || "");
   const [error, setError] = useState<AddHandleError>(null);
   const [isLoading, setIsLoading] = useState(false);
+
   const { handles, createHandle } = useStore();
 
   const isValidSLabel = (label: string): boolean => {
@@ -64,6 +67,10 @@ export default function ({ navigation, route }: Props) {
     switch (error) {
       case "handleExists":
         return "This handle already exists in your keystore.";
+      case "handleTaken":
+        return "This handle is already taken";
+      case "handleInvalid":
+        return "This handle is invalid";
       default:
         return "";
     }
@@ -72,24 +79,39 @@ export default function ({ navigation, route }: Props) {
   const addHandle = async () => {
     if (!canAdd) return;
     setError(null);
-    if (handle in handles) {
+    const handlesMap = handles[network] || {};
+    if (handle in handlesMap) {
       setError("handleExists");
       return;
     }
+
     setIsLoading(true);
+    const { status } = await fetchHandleStatus(network, handle);
+
+    switch (status) {
+      case "taken":
+        setError("handleTaken");
+        setIsLoading(false);
+        return;
+      case "invalid":
+        setError("handleInvalid");
+        setIsLoading(false);
+        return;
+    }
     try {
-      await createHandle(handle);
-      navigation.replace("ShowHandle", { handle });
+      await createHandle(network, handle);
+      navigation.replace("ShowHandle", { network, handle });
     } catch (err) {
       setIsLoading(false);
       throw err;
     }
   };
+
   return (
     <Layout
       footer={
         <Button
-          text={isLoading ? "Adding..." : "Add Handle"}
+          text={isLoading ? "Checking..." : "Add Handle"}
           onPress={addHandle}
           type="main"
           disabled={!canAdd}
