@@ -25,11 +25,11 @@ export async function fetchProposedHandles(query: string): Promise<string[]> {
 export type HandleStatus =
   | {
       handle: string;
-      status: "available" | "unknown" | "invalid";
+      status: "available" | "unknown" | "invalid" | "preallocated";
     }
   | {
       handle: string;
-      status: "pending_payment";
+      status: "reserved" | "processing_payment";
       script_pubkey: string;
     }
   | {
@@ -60,12 +60,14 @@ export function isHandleStatus(obj: unknown): obj is HandleStatus {
     h.status !== "available" &&
     h.status !== "unknown" &&
     h.status !== "invalid" &&
-    h.status !== "pending_payment" &&
+    h.status !== "preallocated" &&
+    h.status !== "reserved" &&
+    h.status !== "processing_payment" &&
     h.status !== "taken"
   ) {
     return false;
   }
-  if (h.status === "pending_payment") {
+  if (h.status === "reserved" || h.status === "processing_payment") {
     return typeof h.script_pubkey === "string";
   }
   if (h.status === "taken") {

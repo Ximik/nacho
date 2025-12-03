@@ -87,10 +87,12 @@ export default function ShowHandle({ route, navigation }: Props) {
         setError(result.error);
       } else {
         await applyHandleStatus(result.handle_status);
-        await finishTransaction({
-          purchase,
-          isConsumable: true,
-        });
+        if (result.handle_status.status === "processing_payment") {
+          await finishTransaction({
+            purchase,
+            isConsumable: true,
+          });
+        }
       }
     },
     onPurchaseError: (error) => {
@@ -120,14 +122,14 @@ export default function ShowHandle({ route, navigation }: Props) {
     fetchAndUpdateCert();
   }, [handle]);
 
-  useEffect(() => {
-    if (isProcessingPurchase === true) {
-      const interval = setInterval(() => {
-        fetchAndUpdateCert();
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isProcessingPurchase]);
+  // useEffect(() => {
+  //   if (isProcessingPurchase === true) {
+  //     const interval = setInterval(() => {
+  //       fetchAndUpdateCert();
+  //     }, 5000);
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [isProcessingPurchase]);
 
   const fetchAndUpdateCert = async () => {
     const status = await fetchHandleStatus(handle);
@@ -150,13 +152,20 @@ export default function ShowHandle({ route, navigation }: Props) {
         setRemovableHandleCert(true);
         setError("Handle is invalid.");
         break;
-      case "pending_payment":
+      case "preallocated":
+        setRemovableHandleCert(true);
+        setError("Handle is preallocated.");
+        break;
+      case "reserved":
         if (status.script_pubkey !== script_pubkey) {
           setRemovableHandleCert(true);
           setError("Handle is currently reserved.");
         } else {
           setIsProcessingPurchase(true);
         }
+        break;
+      case "processing_payment":
+        setIsProcessingPurchase(true);
         break;
       case "taken":
         if ("script_pubkey" in status) {
