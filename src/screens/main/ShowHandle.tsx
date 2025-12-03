@@ -87,7 +87,7 @@ export default function ShowHandle({ route, navigation }: Props) {
         setError(result.error);
       } else {
         await applyHandleStatus(result.handle_status);
-        if (result.handle_status.status === "processing_payment") {
+        if (result.handle_status.status === "taken") {
           await finishTransaction({
             purchase,
             isConsumable: true,
