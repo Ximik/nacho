@@ -20,7 +20,7 @@ import { Message } from "@/ui/Message";
 import {
   fetchHandleStatus,
   reserveHandle,
-  claimHandleGoogleIAP,
+  claimHandleIAP,
   HandleStatus,
 } from "@/api";
 import { extractCertData } from "@/cert";
@@ -36,12 +36,22 @@ interface Props {
   navigation: ShowHandleNavigationProp;
 }
 
+let iap: "google_iap" | "apple_iap" | null = null;
+switch (Platform.OS) {
+  case "android":
+    iap = "google_iap";
+    break;
+  case "ios":
+    iap = "apple_iap";
+    break;
+}
 type UseIAPHook = (typeof import("expo-iap"))["useIAP"];
 let useIAP: UseIAPHook | null = null;
-if (Platform.OS !== "web") {
+if (iap !== null) {
   try {
     useIAP = require("expo-iap").useIAP;
   } catch (error) {
+    iap = null;
     console.error("expo-iap not available");
   }
 }
@@ -71,65 +81,73 @@ export default function ShowHandle({ route, navigation }: Props) {
     claimParamsRef.current = { handle, script_pubkey };
   }, [handle, script_pubkey]);
 
-  const { requestPurchase, finishTransaction } = useIAP ? useIAP({
-    onPurchaseSuccess: async (purchase) => {
-      if (!purchase.purchaseToken) {
-        setError("No purchase token received");
-        return;
-      }
-      const { handle, script_pubkey } = claimParamsRef.current;
-      const result = await claimHandleGoogleIAP(
-        handle,
-        script_pubkey,
-        purchase.purchaseToken,
-      );
-      if (result.error) {
-        setError(result.error);
-      } else {
-        await applyHandleStatus(result.handle_status);
-        if (result.handle_status.status === "taken") {
-          await finishTransaction({
-            purchase,
-            isConsumable: true,
-          });
-        }
-      }
-    },
-    onPurchaseError: (error) => {
-      if (error.code !== "user-cancelled") {
-        setError("Purchase failed: " + error.message);
-        setIsProcessingPurchase(null);
-      }
-    },
-  }) : {
-    requestPurchase: async () => {
-      const result = await claimHandleGoogleIAP(
-        handle,
-        script_pubkey,
-        "test_valid_purchase",
-      );
-      if (result.error) {
-        setError(result.error);
-      } else {
-        await applyHandleStatus(result.handle_status);
-      }
-      return null;
-    },
-    finishTransaction: async ()=> {}
-  } as Pick<ReturnType<UseIAPHook>, 'requestPurchase' | 'finishTransaction'>;
+  const { requestPurchase, finishTransaction } =
+    iap && useIAP
+      ? useIAP({
+          onPurchaseSuccess: async (purchase) => {
+            if (!purchase.purchaseToken) {
+              setError("No purchase token received");
+              return;
+            }
+            const { handle, script_pubkey } = claimParamsRef.current;
+            const result = await claimHandleIAP(
+              handle,
+              script_pubkey,
+              purchase.purchaseToken,
+              iap,
+            );
+            if (result.error) {
+              setError(result.error);
+            } else {
+              await applyHandleStatus(result.handle_status);
+              if (result.handle_status.status === "taken") {
+                await finishTransaction({
+                  purchase,
+                  isConsumable: true,
+                });
+              }
+            }
+          },
+          onPurchaseError: (error) => {
+            if (error.code !== "user-cancelled") {
+              setError("Purchase failed: " + error.message);
+              setIsProcessingPurchase(null);
+            }
+          },
+        })
+      : ({
+          requestPurchase: async () => {
+            const result = await claimHandleIAP(
+              handle,
+              script_pubkey,
+              "test_valid_purchase",
+              "google_iap",
+            );
+            if (result.error) {
+              setError(result.error);
+            } else {
+              await applyHandleStatus(result.handle_status);
+            }
+            return null;
+          },
+          finishTransaction: async () => {},
+        } as Pick<
+          ReturnType<UseIAPHook>,
+          "requestPurchase" | "finishTransaction"
+        >);
 
   useEffect(() => {
     fetchAndUpdateCert();
   }, [handle]);
 
-  // useEffect(() => {
-  //   if (isProcessingPurchase === true) {
-  //     const interval = setInterval(() => {
-  //       fetchAndUpdateCert();
-  //     }, 5000);
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [isProcessingPurchase]);
+  useEffect(() => {
+    if (isProcessingPurchase === true) {
+      const interval = setInterval(() => {
+        fetchAndUpdateCert();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isProcessingPurchase]);
 
   const fetchAndUpdateCert = async () => {
     const status = await fetchHandleStatus(handle);
@@ -214,7 +232,7 @@ export default function ShowHandle({ route, navigation }: Props) {
     setIsProcessingPurchase(true);
     setError(null);
 
-    const result = await reserveHandle(handle, script_pubkey, "google_iap");
+    const result = await reserveHandle(handle, script_pubkey);
     if ("error" in result) {
       setError(result.error);
       setIsProcessingPurchase(false);
@@ -233,7 +251,7 @@ export default function ShowHandle({ route, navigation }: Props) {
       setIsProcessingPurchase(false);
       setError(
         "Failed purchase: " +
-        (error instanceof Error ? error.message : String(error)),
+          (error instanceof Error ? error.message : String(error)),
       );
     }
   };

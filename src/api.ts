@@ -123,7 +123,6 @@ export async function fetchHandleStatus(handle: string): Promise<HandleStatus> {
 export async function reserveHandle(
   handle: string,
   script_pubkey: string,
-  payment_method: "google_iap",
 ): Promise<
   | {
       deadline: number;
@@ -141,7 +140,7 @@ export async function reserveHandle(
       body: JSON.stringify({
         handle,
         script_pubkey,
-        payment_method,
+        payment_type: "aip",
       }),
     });
 
@@ -165,29 +164,28 @@ export async function reserveHandle(
   }
 }
 
-export async function claimHandleGoogleIAP(
+export async function claimHandleIAP(
   handle: string,
   script_pubkey: string,
   purchase_token: string,
+  payment_method: "google_iap" | "apple_iap",
 ): Promise<{
   handle_status: HandleStatus;
   error?: string;
 }> {
   try {
-    const response = await fetch(
-      "https://testnet.atbitcoin.com/api/android/claim",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          handle,
-          script_pubkey,
-          purchase_token,
-        }),
+    const response = await fetch("https://testnet.atbitcoin.com/api/claim", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        handle,
+        script_pubkey,
+        purchase_token,
+        payment_method,
+      }),
+    });
 
     const data = await response.json();
     if (
