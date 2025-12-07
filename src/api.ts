@@ -140,13 +140,13 @@ export async function reserveHandle(
       body: JSON.stringify({
         handle,
         script_pubkey,
-        payment_type: "aip",
+        payment_type: "iap",
       }),
     });
 
     if (!response.ok) {
       const text = await response.text();
-      return { error: text };
+      return { error: text.trim() };
     }
 
     const data = await response.json();
