@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -44,7 +44,7 @@ const iap = (() => {
       try {
         const hook = require("expo-iap").useIAP as IAPHook;
         return {
-          payment:
+          platform:
             Platform.OS === "android"
               ? ("google_iap" as const)
               : ("apple_iap" as const),
@@ -79,12 +79,6 @@ export default function ShowHandle({ route, navigation }: Props) {
   const pubkey = pubFromPath(xpub, handleData.path);
   const script_pubkey = p2trScriptFromPub(pubkey);
 
-  const claimParamsRef = useRef({ handle, script_pubkey });
-
-  useEffect(() => {
-    claimParamsRef.current = { handle, script_pubkey };
-  }, [handle, script_pubkey]);
-
   const { requestPurchase, finishTransaction } = iap
     ? iap.hook({
         onPurchaseSuccess: async (purchase) => {
@@ -92,13 +86,12 @@ export default function ShowHandle({ route, navigation }: Props) {
             setError("No purchase token received");
             return;
           }
-          const { handle, script_pubkey } = claimParamsRef.current;
           const result = await claimHandleIAP(
             network,
             handle,
             script_pubkey,
             purchase.purchaseToken,
-            iap.payment,
+            iap.platform,
           );
           if (result.error) {
             setError(result.error);
@@ -121,6 +114,19 @@ export default function ShowHandle({ route, navigation }: Props) {
       })
     : ({
         requestPurchase: async () => {
+          const result = await claimHandleIAP(
+            network,
+            handle,
+            script_pubkey,
+            `test_valid_purchase_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            "google_iap",
+          );
+          if (result.error) {
+            setError(result.error);
+            setIsProcessingPurchase(null);
+          } else {
+            await applyHandleStatus(result.handle_status);
+          }
           return null;
         },
         finishTransaction: async () => {},
@@ -309,7 +315,13 @@ export default function ShowHandle({ route, navigation }: Props) {
             ) : (
               <>
                 <Button
-                  text={isProcessingPurchase ? "Processing..." : "Buy Handle"}
+                  text={
+                    isProcessingPurchase
+                      ? "Processing..."
+                      : network === "testnet4"
+                        ? "Claim Handle"
+                        : "Buy Handle"
+                  }
                   onPress={handleBuyHandle}
                   type="main"
                   disabled={isProcessingPurchase}

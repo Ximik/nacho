@@ -111,8 +111,7 @@ function MainNavigator() {
         component={ListHandles}
         options={({ navigation, route }) => ({
           title: "Handles",
-          headerRight: () =>
-            networkSwitcher(navigation, route.params.network),
+          headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
         initialParams={{ network: "testnet4" }}
       />
@@ -121,8 +120,7 @@ function MainNavigator() {
         component={ShowHandle}
         options={({ navigation, route }) => ({
           title: "Handles",
-          headerRight: () =>
-            networkSwitcher(navigation, route.params.network),
+          headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
       />
       <HandlesStack.Screen
@@ -130,8 +128,7 @@ function MainNavigator() {
         component={AddHandle}
         options={({ navigation, route }) => ({
           title: "Handles",
-          headerRight: () =>
-            networkSwitcher(navigation, route.params.network),
+          headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
       />
       <HandlesStack.Screen
@@ -139,8 +136,7 @@ function MainNavigator() {
         component={ImportCertificate}
         options={({ navigation, route }) => ({
           title: "Certificate",
-          headerRight: () =>
-            networkSwitcher(navigation, route.params.network),
+          headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
       />
       <HandlesStack.Screen
@@ -148,8 +144,7 @@ function MainNavigator() {
         component={SignNostrEvent}
         options={({ navigation, route }) => ({
           title: "Nostr Event",
-          headerRight: () =>
-            networkSwitcher(navigation, route.params.network),
+          headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
       />
     </HandlesStack.Navigator>
