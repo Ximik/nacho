@@ -78,7 +78,8 @@ export default function ({ route, navigation }: Props) {
   const addHandle = async () => {
     if (!canAdd) return;
     setError(null);
-    if (handle in handles) {
+    const handlesMap = handles[network] || {};
+    if (handle in handlesMap) {
       setError("handleExists");
       return;
     }

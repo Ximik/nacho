@@ -42,17 +42,22 @@ export default function ListHandles({ route, navigation }: Props) {
   );
 
   useEffect(() => {
+    let isCancelled = false;
     const timeoutId = setTimeout(async () => {
       if (searchQuery) {
         const results = await fetchProposedHandles(network, searchQuery);
-        setProposedHandles(results);
+        if (!isCancelled) {
+          setProposedHandles(results);
+        }
       } else {
         setProposedHandles([]);
       }
     }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [searchQuery, network]);
 
   useLayoutEffect(() => {
     const exportKeystore = async () => {

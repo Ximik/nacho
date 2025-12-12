@@ -117,7 +117,7 @@ export function isKeystore(obj: unknown): obj is Keystore {
     if (!handlesMap || typeof handlesMap !== "object") {
       return false;
     }
-    for (const handleData of Object.entries(
+    for (const handleData of Object.values(
       handlesMap as Record<string, unknown>,
     )) {
       if (!isHandleData(handleData)) {
@@ -136,7 +136,6 @@ type StoreContextType = {
   createHandle: (
     network: Network,
     handle: string,
-    cert?: string,
   ) => Promise<void>;
   removeHandle: (network: Network, handle: string) => Promise<void>;
   setHandleCertData: (

@@ -72,7 +72,8 @@ export default function ShowHandle({ route, navigation }: Props) {
   const handleData = handles?.[network]?.[handle];
 
   if (!xpub || !handleData) {
-    return;
+    navigation.replace("ListHandles", { network });
+    return null;
   }
 
   const pubkey = pubFromPath(xpub, handleData.path);
