@@ -103,7 +103,10 @@ function MainNavigator() {
 
   return (
     <HandlesStack.Navigator
-      screenOptions={screenOptions}
+      screenOptions={{
+        ...screenOptions,
+        unmountOnBlur: true,
+      }}
       initialRouteName="ListHandles"
     >
       <HandlesStack.Screen

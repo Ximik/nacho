@@ -1,5 +1,4 @@
 import React, { useLayoutEffect, useState, useEffect } from "react";
-import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -34,29 +33,16 @@ export default function ListHandles({ route, navigation }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [proposedHandles, setProposedHandles] = useState<string[]>([]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      setSearchQuery("");
-      setProposedHandles([]);
-    }, []),
-  );
-
   useEffect(() => {
-    let isCancelled = false;
     const timeoutId = setTimeout(async () => {
       if (searchQuery) {
         const results = await fetchProposedHandles(network, searchQuery);
-        if (!isCancelled) {
-          setProposedHandles(results);
-        }
+        setProposedHandles(results);
       } else {
         setProposedHandles([]);
       }
     }, 300);
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeoutId);
-    };
+    return () => clearTimeout(timeoutId);
   }, [searchQuery, network]);
 
   const exportKeystore = async () => {
