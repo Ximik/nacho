@@ -118,7 +118,7 @@ export default function ShowHandle({ route, navigation }: Props) {
             network,
             handle,
             script_pubkey,
-            `test_valid_purchase_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            `test_valid_purchase_${Date.now().toString()}${Math.random().toString(36).slice(1)}`,
             "google_iap",
           );
           if (result.error) {
@@ -350,7 +350,7 @@ export default function ShowHandle({ route, navigation }: Props) {
 
       <View style={styles.section}>
         <Text style={styles.label}>Public Key</Text>
-        <Text style={styles.value} numberOfLines={6}>
+        <Text style={styles.value} numberOfLines={6} breakStrategy="simple">
           {pubkey}
         </Text>
       </View>
@@ -358,7 +358,7 @@ export default function ShowHandle({ route, navigation }: Props) {
       {handleData.cert && (
         <View style={styles.section}>
           <Text style={styles.label}>Proof</Text>
-          <Text style={styles.value} numberOfLines={10}>
+          <Text style={styles.value} numberOfLines={10} breakStrategy="simple">
             {handleData.cert.witness.data}
           </Text>
         </View>
@@ -397,7 +397,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     fontFamily: "monospace",
     lineHeight: 20,
-  },
+    // @ts-ignore - web-specific styles for word breaking
+    wordBreak: "break-all",
+    overflowWrap: "break-word",
+  } as any,
   confirmSection: {
     backgroundColor: "#1A1A1A",
     padding: 20,

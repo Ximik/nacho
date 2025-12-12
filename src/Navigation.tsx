@@ -90,7 +90,10 @@ function MainNavigator() {
     return (
       <TouchableOpacity
         onPress={() =>
-          navigation.replace("ListHandles", { network: newNetwork })
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "ListHandles", params: { network: newNetwork } }],
+          })
         }
         style={{ paddingRight: 16 }}
       >
