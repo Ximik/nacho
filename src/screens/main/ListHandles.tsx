@@ -14,6 +14,7 @@ import { HandlesStackParamList } from "@/Navigation";
 import { HandleData, useStore } from "@/Store";
 import { Layout } from "@/ui/Layout";
 import { Button } from "@/ui/Button";
+import { NetworkToggle } from "@/ui/NetworkToggle";
 import { fetchProposedHandles } from "@/api";
 
 type ListHandlesNavigationProp = NativeStackNavigationProp<
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export default function ListHandles({ navigation }: Props) {
-  const { xpub, handles } = useStore();
+  const { xpub, handles, network } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [proposedHandles, setProposedHandles] = useState<string[]>([]);
 
@@ -40,7 +41,7 @@ export default function ListHandles({ navigation }: Props) {
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       if (searchQuery) {
-        const results = await fetchProposedHandles(searchQuery);
+        const results = await fetchProposedHandles(network, searchQuery);
         setProposedHandles(results);
       } else {
         setProposedHandles([]);
@@ -48,35 +49,32 @@ export default function ListHandles({ navigation }: Props) {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [searchQuery, network]);
+
+  const exportKeystore = async () => {
+    try {
+      const keystoreData = { xpub, handles };
+      const fileName = `keystore_${Date.now()}.json`;
+      await save(fileName, keystoreData);
+    } catch (error) {
+      throw new Error("Failed to export keystore: " + error);
+    }
+  };
 
   useLayoutEffect(() => {
-    const exportKeystore = async () => {
-      try {
-        const keystoreData = { xpub, handles };
-        const fileName = `keystore_${Date.now()}.json`;
-        await save(fileName, keystoreData);
-      } catch (error) {
-        throw new Error("Failed to export keystore: " + error);
-      }
-    };
-
     navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity onPress={exportKeystore} style={styles.headerButton}>
-          <Text style={styles.headerButtonText}>Backup</Text>
-        </TouchableOpacity>
-      ),
+      headerRight: () => <NetworkToggle />,
     });
-  }, [navigation, xpub, handles]);
+  }, [navigation]);
 
-  const handlesList = handles ? Object.entries(handles) : [];
+  const handlesMap = handles?.[network] || {};
+  const handlesList = Object.entries(handlesMap);
   const combinedHandles = [
     ...(searchQuery
       ? handlesList.filter(([handleName]) => handleName.includes(searchQuery))
       : handlesList),
     ...proposedHandles
-      .filter((proposedHandle) => !handles || !handles[proposedHandle])
+      .filter((proposedHandle) => !handles || !handlesMap[proposedHandle])
       .map((handle) => [handle, null] as [string, null]),
   ];
 
@@ -154,6 +152,11 @@ export default function ListHandles({ navigation }: Props) {
           <Button
             text="Import Certificate"
             onPress={() => navigation.navigate("ImportCertificate")}
+            type="secondary"
+          />
+          <Button
+            text="Backup Keystore"
+            onPress={exportKeystore}
             type="secondary"
           />
         </>

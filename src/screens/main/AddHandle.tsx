@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useLayoutEffect } from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
@@ -8,6 +8,7 @@ import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
+import { NetworkToggle } from "@/ui/NetworkToggle";
 import { fetchHandleStatus } from "@/api";
 
 type AddHandleNavigationProp = NativeStackNavigationProp<
@@ -28,7 +29,13 @@ export default function ({ navigation, route }: Props) {
   const [handle, setHandle] = useState(route.params?.initialHandle || "");
   const [error, setError] = useState<AddHandleError>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { handles, createHandle } = useStore();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <NetworkToggle />,
+    });
+  }, [navigation]);
+  const { handles, network, createHandle } = useStore();
 
   const isValidSLabel = (label: string): boolean => {
     if (!label || label.length > 62) {
@@ -82,7 +89,7 @@ export default function ({ navigation, route }: Props) {
       return;
     }
     setIsLoading(true);
-    const { status } = await fetchHandleStatus(handle);
+    const { status } = await fetchHandleStatus(network, handle);
     switch (status) {
       case "taken":
         setError("handleTaken");
@@ -94,7 +101,7 @@ export default function ({ navigation, route }: Props) {
         return;
     }
     try {
-      await createHandle(handle);
+      await createHandle(network, handle);
       navigation.replace("ShowHandle", { handle });
     } catch (err) {
       setIsLoading(false);

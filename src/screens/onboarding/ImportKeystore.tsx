@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { open } from "@/file";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useStore, KeystoreData, isKeystoreData } from "@/Store";
+import { useStore, Keystore, isKeystore } from "@/Store";
 import { OnboardingStackParamList } from "@/Navigation";
 import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
@@ -20,19 +20,19 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, "ImportKeystore">;
 
 export default function ImportKeystore({ navigation }: Props) {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [keystoreData, setKeystoreData] = useState<KeystoreData | null>(null);
+  const [keystore, setKeystore] = useState<Keystore | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const selectFile = async () => {
     setValidationError(null);
-    setKeystoreData(null);
+    setKeystore(null);
     setSelectedFileName(null);
 
     try {
       const { data, filename } = await open();
 
-      if (isKeystoreData(data)) {
-        setKeystoreData(data);
+      if (isKeystore(data)) {
+        setKeystore(data);
         setSelectedFileName(filename);
         setValidationError(null);
       } else {
@@ -51,8 +51,8 @@ export default function ImportKeystore({ navigation }: Props) {
   };
 
   const handleImport = () => {
-    if (keystoreData) {
-      navigation.navigate("EnterMnemonic", keystoreData);
+    if (keystore) {
+      navigation.navigate("EnterMnemonic", keystore);
     }
   };
 
@@ -74,7 +74,7 @@ export default function ImportKeystore({ navigation }: Props) {
           text="Import Keystore"
           onPress={handleImport}
           type="main"
-          disabled={!keystoreData}
+          disabled={!keystore}
         />
       }
     >
@@ -93,7 +93,7 @@ export default function ImportKeystore({ navigation }: Props) {
       {validationError !== null && (
         <Message message={validationError} type="error" />
       )}
-      {keystoreData && !validationError && (
+      {keystore && !validationError && (
         <Message
           message="Keystore file validated successfully. Ready to import."
           type="success"

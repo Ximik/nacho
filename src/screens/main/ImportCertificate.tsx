@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect } from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { Camera, CameraView } from "expo-camera";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -11,6 +11,7 @@ import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
+import { NetworkToggle } from "@/ui/NetworkToggle";
 
 type ImportError =
   | "cameraPermissionFailed"
@@ -31,12 +32,18 @@ interface Props {
 }
 
 export default function ImportCertificate({ navigation }: Props) {
-  const { xpub, handles, setHandleCertData } = useStore();
+  const { xpub, handles, network, setHandleCertData } = useStore();
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
   >(null);
   const [error, setError] = useState<ImportError>(null);
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <NetworkToggle />,
+    });
+  }, [navigation]);
 
   useEffect(() => {
     const requestCameraPermission = async () => {
@@ -138,7 +145,7 @@ export default function ImportCertificate({ navigation }: Props) {
     }
     const certData = extractCertData(data);
     const { handle, script_pubkey } = data;
-    const handleData = handles?.[handle];
+    const handleData = handles?.[network]?.[handle];
     if (
       handleData === undefined ||
       xpub === null ||
@@ -147,7 +154,7 @@ export default function ImportCertificate({ navigation }: Props) {
       setError("invalidHandle");
       return;
     }
-    setHandleCertData(handle, certData).then(() =>
+    setHandleCertData(network, handle, certData).then(() =>
       navigation.navigate("ShowHandle", { handle }),
     );
   };

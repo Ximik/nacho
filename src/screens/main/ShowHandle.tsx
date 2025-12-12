@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Layout } from "@/ui/Layout";
 import { Header } from "@/ui/Header";
 import { Button } from "@/ui/Button";
 import { Message } from "@/ui/Message";
+import { NetworkToggle } from "@/ui/NetworkToggle";
 import {
   fetchHandleStatus,
   reserveHandle,
@@ -58,7 +59,7 @@ if (iap !== null) {
 
 export default function ShowHandle({ route, navigation }: Props) {
   const { handle } = route.params;
-  const { xpub, handles, removeHandle, setHandleCertData } = useStore();
+  const { xpub, handles, network, removeHandle, setHandleCertData } = useStore();
   const [error, setError] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [removableHandleCert, setRemovableHandleCert] = useState(false);
@@ -66,7 +67,7 @@ export default function ShowHandle({ route, navigation }: Props) {
     boolean | null
   >(null);
 
-  const handleData = handles?.[handle];
+  const handleData = handles?.[network]?.[handle];
 
   if (!xpub || !handleData) {
     return;
@@ -76,6 +77,12 @@ export default function ShowHandle({ route, navigation }: Props) {
   const script_pubkey = p2trScriptFromPub(pubkey);
 
   const claimParamsRef = useRef({ handle, script_pubkey });
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <NetworkToggle />,
+    });
+  }, [navigation]);
 
   useEffect(() => {
     claimParamsRef.current = { handle, script_pubkey };
@@ -91,6 +98,7 @@ export default function ShowHandle({ route, navigation }: Props) {
             }
             const { handle, script_pubkey } = claimParamsRef.current;
             const result = await claimHandleIAP(
+              network,
               handle,
               script_pubkey,
               purchase.purchaseToken,
@@ -118,6 +126,7 @@ export default function ShowHandle({ route, navigation }: Props) {
       : ({
           requestPurchase: async () => {
             const result = await claimHandleIAP(
+              network,
               handle,
               script_pubkey,
               "test_valid_purchase",
@@ -150,7 +159,7 @@ export default function ShowHandle({ route, navigation }: Props) {
   }, [isProcessingPurchase]);
 
   const fetchAndUpdateCert = async () => {
-    const status = await fetchHandleStatus(handle);
+    const status = await fetchHandleStatus(network, handle);
     await applyHandleStatus(status);
   };
 
@@ -190,7 +199,7 @@ export default function ShowHandle({ route, navigation }: Props) {
           if (status.script_pubkey === script_pubkey) {
             if ("certificate" in status) {
               const certData = extractCertData(status.certificate);
-              await setHandleCertData(handle, certData);
+              await setHandleCertData(network, handle, certData);
             }
           } else {
             setRemovableHandleCert(true);
@@ -204,7 +213,7 @@ export default function ShowHandle({ route, navigation }: Props) {
   };
 
   const handleRemoveHandle = () => {
-    removeHandle(handle);
+    removeHandle(network, handle);
     setShowRemoveConfirm(false);
     navigation.replace("ListHandles");
   };
@@ -232,7 +241,7 @@ export default function ShowHandle({ route, navigation }: Props) {
     setIsProcessingPurchase(true);
     setError(null);
 
-    const result = await reserveHandle(handle, script_pubkey);
+    const result = await reserveHandle(network, handle, script_pubkey);
     if ("error" in result) {
       setError(result.error);
       setIsProcessingPurchase(false);
