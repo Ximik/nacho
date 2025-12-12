@@ -59,25 +59,15 @@ export default function ListHandles({ route, navigation }: Props) {
     };
   }, [searchQuery, network]);
 
-  useLayoutEffect(() => {
-    const exportKeystore = async () => {
-      try {
-        const keystore = { xpub, handles };
-        const fileName = `keystore_${Date.now()}.json`;
-        await save(fileName, keystore);
-      } catch (error) {
-        throw new Error("Failed to export keystore: " + error);
-      }
-    };
-
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity onPress={exportKeystore} style={styles.headerButton}>
-          <Text style={styles.headerButtonText}>Backup</Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, xpub, handles]);
+  const exportKeystore = async () => {
+    try {
+      const keystore = { xpub, handles };
+      const fileName = `keystore_${Date.now()}.json`;
+      await save(fileName, keystore);
+    } catch (error) {
+      throw new Error("Failed to export keystore: " + error);
+    }
+  };
 
   const handlesMap = handles?.[network] || {};
   const handlesList = Object.entries(handlesMap);
@@ -166,6 +156,11 @@ export default function ListHandles({ route, navigation }: Props) {
             onPress={() =>
               navigation.navigate("ImportCertificate", { network })
             }
+            type="secondary"
+          />
+          <Button
+            text="Backup Keystore"
+            onPress={exportKeystore}
             type="secondary"
           />
         </>
@@ -274,13 +269,5 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#D6D6D6",
     fontSize: 16,
-  },
-  headerButton: {
-    paddingRight: 16,
-  },
-  headerButtonText: {
-    color: "#FF7B00",
-    fontSize: 16,
-    fontWeight: "400",
   },
 });

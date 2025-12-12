@@ -133,10 +133,7 @@ type StoreContextType = {
   handles: Handles | null;
   getXprv: () => Promise<string | null>;
   setupKeystore: (xprv: string, handles: Handles) => Promise<void>;
-  createHandle: (
-    network: Network,
-    handle: string,
-  ) => Promise<void>;
+  createHandle: (network: Network, handle: string) => Promise<void>;
   removeHandle: (network: Network, handle: string) => Promise<void>;
   setHandleCertData: (
     network: Network,

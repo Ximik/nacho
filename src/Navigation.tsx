@@ -1,6 +1,7 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { TouchableOpacity, Text } from "react-native";
 import { Handles, Network, useStore } from "@/Store";
 import OnboardingHome from "./screens/onboarding/Home";
 import ShowMnemonic from "./screens/onboarding/ShowMnemonic";
@@ -83,6 +84,23 @@ function OnboardingNavigator() {
 }
 
 function MainNavigator() {
+  const networkSwitcher = (navigation: any, network: Network) => {
+    const newNetwork: Network = network === "testnet4" ? "mainnet" : "testnet4";
+    const displayName = network === "mainnet" ? "Mainnet" : "Testnet";
+    return (
+      <TouchableOpacity
+        onPress={() =>
+          navigation.navigate("ListHandles", { network: newNetwork })
+        }
+        style={{ paddingRight: 16 }}
+      >
+        <Text style={{ color: "#FF7B00", fontSize: 16, fontWeight: "400" }}>
+          {displayName}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <HandlesStack.Navigator
       screenOptions={screenOptions}
@@ -91,28 +109,48 @@ function MainNavigator() {
       <HandlesStack.Screen
         name="ListHandles"
         component={ListHandles}
-        options={{ title: "Handles" }}
+        options={({ navigation, route }) => ({
+          title: "Handles",
+          headerRight: () =>
+            networkSwitcher(navigation, route.params.network),
+        })}
         initialParams={{ network: "testnet4" }}
       />
       <HandlesStack.Screen
         name="ShowHandle"
         component={ShowHandle}
-        options={{ title: "Handles" }}
+        options={({ navigation, route }) => ({
+          title: "Handles",
+          headerRight: () =>
+            networkSwitcher(navigation, route.params.network),
+        })}
       />
       <HandlesStack.Screen
         name="AddHandle"
         component={AddHandle}
-        options={{ title: "Handles" }}
+        options={({ navigation, route }) => ({
+          title: "Handles",
+          headerRight: () =>
+            networkSwitcher(navigation, route.params.network),
+        })}
       />
       <HandlesStack.Screen
         name="ImportCertificate"
         component={ImportCertificate}
-        options={{ title: "Certificate" }}
+        options={({ navigation, route }) => ({
+          title: "Certificate",
+          headerRight: () =>
+            networkSwitcher(navigation, route.params.network),
+        })}
       />
       <HandlesStack.Screen
         name="SignNostrEvent"
         component={SignNostrEvent}
-        options={{ title: "Nostr Event" }}
+        options={({ navigation, route }) => ({
+          title: "Nostr Event",
+          headerRight: () =>
+            networkSwitcher(navigation, route.params.network),
+        })}
       />
     </HandlesStack.Navigator>
   );
