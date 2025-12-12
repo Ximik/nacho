@@ -90,7 +90,7 @@ function MainNavigator() {
     return (
       <TouchableOpacity
         onPress={() =>
-          navigation.navigate("ListHandles", { network: newNetwork })
+          navigation.replace("ListHandles", { network: newNetwork })
         }
         style={{ paddingRight: 16 }}
       >
