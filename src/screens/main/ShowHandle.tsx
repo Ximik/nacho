@@ -36,28 +36,31 @@ interface Props {
   navigation: ShowHandleNavigationProp;
 }
 
-let iap: "google_iap" | "apple_iap" | null = null;
-switch (Platform.OS) {
-  case "android":
-    iap = "google_iap";
-    break;
-  case "ios":
-    iap = "apple_iap";
-    break;
-}
-type UseIAPHook = (typeof import("expo-iap"))["useIAP"];
-let useIAP: UseIAPHook | null = null;
-if (iap !== null) {
-  try {
-    useIAP = require("expo-iap").useIAP;
-  } catch (error) {
-    iap = null;
-    console.error("expo-iap not available");
+type IAPHook = (typeof import("expo-iap"))["useIAP"];
+const iap = (() => {
+  switch (Platform.OS) {
+    case "android":
+    case "ios":
+      try {
+        const hook = require("expo-iap").useIAP as IAPHook;
+        return {
+          payment:
+            Platform.OS === "android"
+              ? ("google_iap" as const)
+              : ("apple_iap" as const),
+          hook,
+        };
+      } catch (error) {
+        console.error("expo-iap not available");
+        return null;
+      }
+    default:
+      return null;
   }
-}
+})();
 
 export default function ShowHandle({ route, navigation }: Props) {
-  const { handle } = route.params;
+  const { network, handle } = route.params;
   const { xpub, handles, removeHandle, setHandleCertData } = useStore();
   const [error, setError] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -66,7 +69,7 @@ export default function ShowHandle({ route, navigation }: Props) {
     boolean | null
   >(null);
 
-  const handleData = handles?.[handle];
+  const handleData = handles?.[network]?.[handle];
 
   if (!xpub || !handleData) {
     return;
@@ -81,60 +84,46 @@ export default function ShowHandle({ route, navigation }: Props) {
     claimParamsRef.current = { handle, script_pubkey };
   }, [handle, script_pubkey]);
 
-  const { requestPurchase, finishTransaction } =
-    iap && useIAP
-      ? useIAP({
-          onPurchaseSuccess: async (purchase) => {
-            if (!purchase.purchaseToken) {
-              setError("No purchase token received");
-              return;
+  const { requestPurchase, finishTransaction } = iap
+    ? iap.hook({
+        onPurchaseSuccess: async (purchase) => {
+          if (!purchase.purchaseToken) {
+            setError("No purchase token received");
+            return;
+          }
+          const { handle, script_pubkey } = claimParamsRef.current;
+          const result = await claimHandleIAP(
+            network,
+            handle,
+            script_pubkey,
+            purchase.purchaseToken,
+            iap.payment,
+          );
+          if (result.error) {
+            setError(result.error);
+            setIsProcessingPurchase(null);
+          } else {
+            await applyHandleStatus(result.handle_status);
+            if (result.handle_status.status === "taken") {
+              await finishTransaction({
+                purchase,
+                isConsumable: true,
+              });
             }
-            const { handle, script_pubkey } = claimParamsRef.current;
-            const result = await claimHandleIAP(
-              handle,
-              script_pubkey,
-              purchase.purchaseToken,
-              iap,
-            );
-            if (result.error) {
-              setError(result.error);
-            } else {
-              await applyHandleStatus(result.handle_status);
-              if (result.handle_status.status === "taken") {
-                await finishTransaction({
-                  purchase,
-                  isConsumable: true,
-                });
-              }
-            }
-          },
-          onPurchaseError: (error) => {
-            if (error.code !== "user-cancelled") {
-              setError("Purchase failed: " + error.message);
-              setIsProcessingPurchase(null);
-            }
-          },
-        })
-      : ({
-          requestPurchase: async () => {
-            const result = await claimHandleIAP(
-              handle,
-              script_pubkey,
-              "test_valid_purchase",
-              "google_iap",
-            );
-            if (result.error) {
-              setError(result.error);
-            } else {
-              await applyHandleStatus(result.handle_status);
-            }
-            return null;
-          },
-          finishTransaction: async () => {},
-        } as Pick<
-          ReturnType<UseIAPHook>,
-          "requestPurchase" | "finishTransaction"
-        >);
+          }
+        },
+        onPurchaseError: (error) => {
+          if (error.code !== "user-cancelled") {
+            setError("Purchase failed: " + error.message);
+          }
+        },
+      })
+    : ({
+        requestPurchase: async () => {
+          return null;
+        },
+        finishTransaction: async () => {},
+      } as Pick<ReturnType<IAPHook>, "requestPurchase" | "finishTransaction">);
 
   useEffect(() => {
     fetchAndUpdateCert();
@@ -150,7 +139,7 @@ export default function ShowHandle({ route, navigation }: Props) {
   }, [isProcessingPurchase]);
 
   const fetchAndUpdateCert = async () => {
-    const status = await fetchHandleStatus(handle);
+    const status = await fetchHandleStatus(network, handle);
     await applyHandleStatus(status);
   };
 
@@ -190,7 +179,7 @@ export default function ShowHandle({ route, navigation }: Props) {
           if (status.script_pubkey === script_pubkey) {
             if ("certificate" in status) {
               const certData = extractCertData(status.certificate);
-              await setHandleCertData(handle, certData);
+              await setHandleCertData(network, handle, certData);
             }
           } else {
             setRemovableHandleCert(true);
@@ -204,9 +193,9 @@ export default function ShowHandle({ route, navigation }: Props) {
   };
 
   const handleRemoveHandle = () => {
-    removeHandle(handle);
+    removeHandle(network, handle);
     setShowRemoveConfirm(false);
-    navigation.replace("ListHandles");
+    navigation.replace("ListHandles", { network });
   };
 
   const handleDownloadCertificate = async () => {
@@ -232,7 +221,7 @@ export default function ShowHandle({ route, navigation }: Props) {
     setIsProcessingPurchase(true);
     setError(null);
 
-    const result = await reserveHandle(handle, script_pubkey);
+    const result = await reserveHandle(network, handle, script_pubkey);
     if ("error" in result) {
       setError(result.error);
       setIsProcessingPurchase(false);
@@ -299,7 +288,7 @@ export default function ShowHandle({ route, navigation }: Props) {
               <Button
                 text="Sign Nostr Event"
                 onPress={() =>
-                  navigation.navigate("SignNostrEvent", { handle })
+                  navigation.navigate("SignNostrEvent", { network, handle })
                 }
                 type="main"
               />

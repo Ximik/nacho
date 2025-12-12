@@ -1,8 +1,18 @@
 import { Cert, CertData, isCert, isCertData } from "@/cert";
+import { Network } from "@/Store";
 
-export async function fetchProposedHandles(query: string): Promise<string[]> {
+function getApiBaseUrl(network: Network): string {
+  return network === "testnet4"
+    ? "https://testnet.atbitcoin.com/api"
+    : "https://testnet.atbitcoin.com/api";
+}
+
+export async function fetchProposedHandles(
+  network: Network,
+  query: string,
+): Promise<string[]> {
   try {
-    const response = await fetch("https://testnet.atbitcoin.com/api/proposed", {
+    const response = await fetch(`${getApiBaseUrl(network)}/proposed`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -80,19 +90,17 @@ export function isHandleStatus(obj: unknown): obj is HandleStatus {
 }
 
 export async function fetchHandlesStatuses(
+  network: Network,
   handles: string[],
 ): Promise<HandleStatus[]> {
   try {
-    const response = await fetch(
-      "https://testnet.atbitcoin.com/api/spaces/status",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ handles }),
+    const response = await fetch(`${getApiBaseUrl(network)}/spaces/status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({ handles }),
+    });
     if (!response.ok) {
       throw new Error(`HTTP status: ${response.status}`);
     }
@@ -112,8 +120,11 @@ export async function fetchHandlesStatuses(
   }
 }
 
-export async function fetchHandleStatus(handle: string): Promise<HandleStatus> {
-  const status = (await fetchHandlesStatuses([handle]))[0];
+export async function fetchHandleStatus(
+  network: Network,
+  handle: string,
+): Promise<HandleStatus> {
+  const status = (await fetchHandlesStatuses(network, [handle]))[0];
   if (status !== undefined) {
     return status;
   }
@@ -121,6 +132,7 @@ export async function fetchHandleStatus(handle: string): Promise<HandleStatus> {
 }
 
 export async function reserveHandle(
+  network: Network,
   handle: string,
   script_pubkey: string,
 ): Promise<
@@ -132,7 +144,7 @@ export async function reserveHandle(
   | { error: string }
 > {
   try {
-    const response = await fetch("https://testnet.atbitcoin.com/api/reserve", {
+    const response = await fetch(`${getApiBaseUrl(network)}/reserve`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -165,6 +177,7 @@ export async function reserveHandle(
 }
 
 export async function claimHandleIAP(
+  network: Network,
   handle: string,
   script_pubkey: string,
   purchase_token: string,
@@ -174,7 +187,7 @@ export async function claimHandleIAP(
   error?: string;
 }> {
   try {
-    const response = await fetch("https://testnet.atbitcoin.com/api/claim", {
+    const response = await fetch(`${getApiBaseUrl(network)}/claim`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

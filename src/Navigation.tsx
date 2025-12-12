@@ -1,7 +1,7 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Handles, useStore } from "@/Store";
+import { Handles, Network, useStore } from "@/Store";
 import OnboardingHome from "./screens/onboarding/Home";
 import ShowMnemonic from "./screens/onboarding/ShowMnemonic";
 import ImportKeystore from "./screens/onboarding/ImportKeystore";
@@ -29,11 +29,11 @@ export type OnboardingStackParamList = {
 const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 
 export type HandlesStackParamList = {
-  ListHandles: undefined;
-  ShowHandle: { handle: string };
-  AddHandle: { initialHandle?: string };
-  ImportCertificate: undefined;
-  SignNostrEvent: { handle: string };
+  ListHandles: { network: Network };
+  ShowHandle: { network: Network; handle: string };
+  AddHandle: { network: Network; initialHandle?: string };
+  ImportCertificate: { network: Network };
+  SignNostrEvent: { network: Network; handle: string };
 };
 
 const HandlesStack = createNativeStackNavigator<HandlesStackParamList>();
@@ -92,6 +92,7 @@ function MainNavigator() {
         name="ListHandles"
         component={ListHandles}
         options={{ title: "Handles" }}
+        initialParams={{ network: "testnet4" }}
       />
       <HandlesStack.Screen
         name="ShowHandle"

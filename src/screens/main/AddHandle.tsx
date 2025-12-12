@@ -24,8 +24,9 @@ interface Props {
 
 type AddHandleError = "handleExists" | "handleTaken" | "handleInvalid" | null;
 
-export default function ({ navigation, route }: Props) {
-  const [handle, setHandle] = useState(route.params?.initialHandle || "");
+export default function ({ route, navigation }: Props) {
+  const { network, initialHandle } = route.params;
+  const [handle, setHandle] = useState(initialHandle || "");
   const [error, setError] = useState<AddHandleError>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { handles, createHandle } = useStore();
@@ -82,7 +83,7 @@ export default function ({ navigation, route }: Props) {
       return;
     }
     setIsLoading(true);
-    const { status } = await fetchHandleStatus(handle);
+    const { status } = await fetchHandleStatus(network, handle);
     switch (status) {
       case "taken":
         setError("handleTaken");
@@ -94,8 +95,8 @@ export default function ({ navigation, route }: Props) {
         return;
     }
     try {
-      await createHandle(handle);
-      navigation.replace("ShowHandle", { handle });
+      await createHandle(network, handle);
+      navigation.replace("ShowHandle", { network, handle });
     } catch (err) {
       setIsLoading(false);
       throw err;

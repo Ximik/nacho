@@ -8,24 +8,28 @@ import {
   StyleSheet,
   TextInput,
 } from "react-native";
-import { save } from "@/file";
+import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
 import { HandleData, useStore } from "@/Store";
 import { Layout } from "@/ui/Layout";
 import { Button } from "@/ui/Button";
 import { fetchProposedHandles } from "@/api";
+import { save } from "@/file";
 
+type ListHandlesRouteProp = RouteProp<HandlesStackParamList, "ListHandles">;
 type ListHandlesNavigationProp = NativeStackNavigationProp<
   HandlesStackParamList,
   "ListHandles"
 >;
 
 interface Props {
+  route: ListHandlesRouteProp;
   navigation: ListHandlesNavigationProp;
 }
 
-export default function ListHandles({ navigation }: Props) {
+export default function ListHandles({ route, navigation }: Props) {
+  const { network } = route.params;
   const { xpub, handles } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [proposedHandles, setProposedHandles] = useState<string[]>([]);
@@ -40,7 +44,7 @@ export default function ListHandles({ navigation }: Props) {
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       if (searchQuery) {
-        const results = await fetchProposedHandles(searchQuery);
+        const results = await fetchProposedHandles(network, searchQuery);
         setProposedHandles(results);
       } else {
         setProposedHandles([]);
@@ -53,9 +57,9 @@ export default function ListHandles({ navigation }: Props) {
   useLayoutEffect(() => {
     const exportKeystore = async () => {
       try {
-        const keystoreData = { xpub, handles };
+        const keystore = { xpub, handles };
         const fileName = `keystore_${Date.now()}.json`;
-        await save(fileName, keystoreData);
+        await save(fileName, keystore);
       } catch (error) {
         throw new Error("Failed to export keystore: " + error);
       }
@@ -70,13 +74,14 @@ export default function ListHandles({ navigation }: Props) {
     });
   }, [navigation, xpub, handles]);
 
-  const handlesList = handles ? Object.entries(handles) : [];
+  const handlesMap = handles?.[network] || {};
+  const handlesList = Object.entries(handlesMap);
   const combinedHandles = [
     ...(searchQuery
       ? handlesList.filter(([handleName]) => handleName.includes(searchQuery))
       : handlesList),
     ...proposedHandles
-      .filter((proposedHandle) => !handles || !handles[proposedHandle])
+      .filter((proposedHandle) => !handles || !handlesMap[proposedHandle])
       .map((handle) => [handle, null] as [string, null]),
   ];
 
@@ -109,7 +114,7 @@ export default function ListHandles({ navigation }: Props) {
     return (
       <TouchableOpacity
         onPress={() =>
-          navigation.navigate("ShowHandle", { handle: handleName })
+          navigation.navigate("ShowHandle", { network, handle: handleName })
         }
         style={styles.handleItem}
       >
@@ -128,7 +133,7 @@ export default function ListHandles({ navigation }: Props) {
       <TouchableOpacity
         style={styles.proposedHandleItem}
         onPress={() =>
-          navigation.navigate("AddHandle", { initialHandle: item })
+          navigation.navigate("AddHandle", { network, initialHandle: item })
         }
       >
         <View style={styles.handleContent}>
@@ -148,12 +153,14 @@ export default function ListHandles({ navigation }: Props) {
         <>
           <Button
             text="Add Handle"
-            onPress={() => navigation.navigate("AddHandle", {})}
+            onPress={() => navigation.navigate("AddHandle", { network })}
             type="main"
           />
           <Button
             text="Import Certificate"
-            onPress={() => navigation.navigate("ImportCertificate")}
+            onPress={() =>
+              navigation.navigate("ImportCertificate", { network })
+            }
             type="secondary"
           />
         </>

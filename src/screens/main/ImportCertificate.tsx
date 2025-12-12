@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { Camera, CameraView } from "expo-camera";
+import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
 import { open } from "@/file";
@@ -21,16 +22,22 @@ type ImportError =
   | "invalidHandle"
   | null;
 
+type ImportCertificateRouteProp = RouteProp<
+  HandlesStackParamList,
+  "ImportCertificate"
+>;
 type ImportCertificateNavigationProp = NativeStackNavigationProp<
   HandlesStackParamList,
   "ImportCertificate"
 >;
 
 interface Props {
+  route: ImportCertificateRouteProp;
   navigation: ImportCertificateNavigationProp;
 }
 
-export default function ImportCertificate({ navigation }: Props) {
+export default function ImportCertificate({ route, navigation }: Props) {
+  const { network } = route.params;
   const { xpub, handles, setHandleCertData } = useStore();
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
@@ -138,7 +145,7 @@ export default function ImportCertificate({ navigation }: Props) {
     }
     const certData = extractCertData(data);
     const { handle, script_pubkey } = data;
-    const handleData = handles?.[handle];
+    const handleData = handles?.[network]?.[handle];
     if (
       handleData === undefined ||
       xpub === null ||
@@ -147,8 +154,8 @@ export default function ImportCertificate({ navigation }: Props) {
       setError("invalidHandle");
       return;
     }
-    setHandleCertData(handle, certData).then(() =>
-      navigation.navigate("ShowHandle", { handle }),
+    setHandleCertData(network, handle, certData).then(() =>
+      navigation.navigate("ShowHandle", { network, handle }),
     );
   };
 
