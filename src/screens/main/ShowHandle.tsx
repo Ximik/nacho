@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-} from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
@@ -63,11 +57,12 @@ export default function ShowHandle({ route, navigation }: Props) {
   const { network, handle } = route.params;
   const { xpub, handles, removeHandle, setHandleCertData } = useStore();
   const [error, setError] = useState<string | null>(null);
-  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [removableHandleCert, setRemovableHandleCert] = useState(false);
-  const [isProcessingPurchase, setIsProcessingPurchase] = useState<
+  const [handleStatusString, setHandleStatusString] =
+    useState<HandleStatus["status"]>("unknown");
+  const [isScriptPubkeyValid, setIsScriptPubkeyValid] = useState<
     boolean | null
   >(null);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   const handleData = handles?.[network]?.[handle];
 
@@ -95,7 +90,7 @@ export default function ShowHandle({ route, navigation }: Props) {
           );
           if (result.error) {
             setError(result.error);
-            setIsProcessingPurchase(null);
+            fetchAndUpdateHandleStatus();
           } else {
             await applyHandleStatus(result.handle_status);
             if (result.handle_status.status === "taken") {
@@ -123,7 +118,7 @@ export default function ShowHandle({ route, navigation }: Props) {
           );
           if (result.error) {
             setError(result.error);
-            setIsProcessingPurchase(null);
+            fetchAndUpdateHandleStatus();
           } else {
             await applyHandleStatus(result.handle_status);
           }
@@ -133,75 +128,92 @@ export default function ShowHandle({ route, navigation }: Props) {
       } as Pick<ReturnType<IAPHook>, "requestPurchase" | "finishTransaction">);
 
   useEffect(() => {
-    fetchAndUpdateCert();
-  }, [handle]);
+    fetchAndUpdateHandleStatus();
+  }, []);
 
   useEffect(() => {
-    if (isProcessingPurchase === true) {
+    if (
+      handleStatusString === "reserved" ||
+      handleStatusString === "processing_payment"
+    ) {
       const interval = setInterval(() => {
-        fetchAndUpdateCert();
+        fetchAndUpdateHandleStatus();
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [isProcessingPurchase]);
+  }, [handleStatusString]);
 
-  const fetchAndUpdateCert = async () => {
+  const fetchAndUpdateHandleStatus = async () => {
     const status = await fetchHandleStatus(network, handle);
     await applyHandleStatus(status);
   };
 
   const applyHandleStatus = async (status: HandleStatus) => {
-    setError(null);
-    setIsProcessingPurchase(null);
-    setRemovableHandleCert(false);
-    switch (status.status) {
-      case "available":
-        setRemovableHandleCert(true);
-        setIsProcessingPurchase(false);
-        break;
-      case "unknown":
-        setRemovableHandleCert(true);
-        break;
-      case "invalid":
-        setRemovableHandleCert(true);
-        setError("Handle is invalid.");
-        break;
-      case "preallocated":
-        setRemovableHandleCert(true);
-        setError("Handle is preallocated.");
-        break;
-      case "reserved":
-        if (status.script_pubkey !== script_pubkey) {
-          setRemovableHandleCert(true);
-          setError("Handle is currently reserved.");
-        } else {
-          setIsProcessingPurchase(true);
+    setHandleStatusString(status.status);
+    if ("script_pubkey" in status) {
+      if (status.script_pubkey === script_pubkey) {
+        setIsScriptPubkeyValid(true);
+        if ("certificate" in status) {
+          const certData = extractCertData(status.certificate);
+          await setHandleCertData(network, handle, certData);
         }
-        break;
-      case "processing_payment":
-        setIsProcessingPurchase(true);
-        break;
-      case "taken":
-        if ("script_pubkey" in status) {
-          if (status.script_pubkey === script_pubkey) {
-            if ("certificate" in status) {
-              const certData = extractCertData(status.certificate);
-              await setHandleCertData(network, handle, certData);
-            }
-          } else {
-            setRemovableHandleCert(true);
-            setError(
-              "Handle certificate found but script_pubkey doesn't match. This handle may belong to a different key.",
-            );
-          }
-        }
-        break;
+      } else {
+        setIsScriptPubkeyValid(true);
+      }
+    } else {
+      setIsScriptPubkeyValid(false);
     }
   };
 
+  //   setIsProcessingPurchase(null);
+  //   setRemovableHandleCert(false);
+  //   switch (status.status) {
+  //     case "available":
+  //       setRemovableHandleCert(true);
+  //       setIsProcessingPurchase(false);
+  //       break;
+  //     case "unknown":
+  //       setRemovableHandleCert(true);
+  //       break;
+  //     case "invalid":
+  //       setRemovableHandleCert(true);
+  //       setError("Handle is invalid.");
+  //       break;
+  //     case "preallocated":
+  //       setRemovableHandleCert(true);
+  //       setError("Handle is preallocated.");
+  //       break;
+  //     case "reserved":
+  //       if (status.script_pubkey !== script_pubkey) {
+  //         setRemovableHandleCert(true);
+  //         setError("Handle is currently reserved.");
+  //       } else {
+  //         setIsProcessingPurchase(true);
+  //       }
+  //       break;
+  //     case "processing_payment":
+  //       setIsProcessingPurchase(true);
+  //       break;
+  //     case "taken":
+  //       if ("script_pubkey" in status) {
+  //         if (status.script_pubkey === script_pubkey) {
+  //           if ("certificate" in status) {
+  //             const certData = extractCertData(status.certificate);
+  //             await setHandleCertData(network, handle, certData);
+  //           }
+  //         } else {
+  //           setRemovableHandleCert(true);
+  //           setError(
+  //             "Handle certificate found but script_pubkey doesn't match. This handle may belong to a different key.",
+  //           );
+  //         }
+  //       }
+  //       break;
+  //   }
+  // };
+
   const handleRemoveHandle = () => {
     removeHandle(network, handle);
-    setShowRemoveConfirm(false);
     navigation.replace("ListHandles", { network });
   };
 
@@ -210,7 +222,6 @@ export default function ShowHandle({ route, navigation }: Props) {
     if (!certData) {
       return;
     }
-
     await save(
       `${handle}.cert.json`,
       buildCert(certData, handle, script_pubkey),
@@ -225,13 +236,12 @@ export default function ShowHandle({ route, navigation }: Props) {
   };
 
   const handleBuyHandle = async () => {
-    setIsProcessingPurchase(true);
     setError(null);
-
+    setHandleStatusString("reserved");
     const result = await reserveHandle(network, handle, script_pubkey);
     if ("error" in result) {
       setError(result.error);
-      setIsProcessingPurchase(false);
+      fetchAndUpdateHandleStatus();
       return;
     }
 
@@ -244,11 +254,11 @@ export default function ShowHandle({ route, navigation }: Props) {
         type: "in-app",
       });
     } catch (error) {
-      setIsProcessingPurchase(false);
       setError(
         "Failed purchase: " +
           (error instanceof Error ? error.message : String(error)),
       );
+      fetchAndUpdateHandleStatus();
     }
   };
 
@@ -264,6 +274,17 @@ export default function ShowHandle({ route, navigation }: Props) {
     }
     return <Text style={styles.handleSpacePart}>{name}</Text>;
   };
+
+  const isRemovable =
+    isScriptPubkeyValid === false ||
+    handleStatusString === "available" ||
+    handleStatusString === "preallocated" ||
+    handleStatusString === "invalid" ||
+    handleStatusString === "unknown";
+  const isProcessingPurchase =
+    isScriptPubkeyValid === true &&
+    (handleStatusString === "reserved" ||
+      handleStatusString === "processing_payment");
 
   return (
     <Layout
@@ -306,7 +327,7 @@ export default function ShowHandle({ route, navigation }: Props) {
                 onPress={handleDownloadCertificate}
                 type="secondary"
               />
-            ) : isProcessingPurchase === null ? (
+            ) : handleStatusString === "unknown" ? (
               <Button
                 text="Download Request"
                 onPress={handleDownloadRequest}
@@ -333,7 +354,7 @@ export default function ShowHandle({ route, navigation }: Props) {
                 />
               </>
             )}
-            {removableHandleCert && (
+            {isRemovable && (
               <Button
                 text="Remove Handle"
                 onPress={() => setShowRemoveConfirm(true)}
@@ -346,7 +367,25 @@ export default function ShowHandle({ route, navigation }: Props) {
     >
       <Text style={styles.title}>{renderHandleName(handle)}</Text>
 
-      {error && <Message message={error} type="error" />}
+      {error ? (
+        <Message message={error} type="error" />
+      ) : isScriptPubkeyValid === false ? (
+        <Message
+          message={
+            handleStatusString === "taken"
+              ? "Handle is taken, but it associated with a different public key."
+              : "Handle is currently reserved by another user."
+          }
+          type="error"
+        />
+      ) : handleStatusString === "taken" &&
+        isScriptPubkeyValid === true &&
+        handleData.cert === undefined ? (
+        <Message
+          message="Handle successfully claimed. Certificate is being generated."
+          type="success"
+        />
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.label}>Public Key</Text>
