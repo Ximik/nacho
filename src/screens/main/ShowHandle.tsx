@@ -162,10 +162,10 @@ export default function ShowHandle({ route, navigation }: Props) {
           await setHandleCertData(network, handle, certData);
         }
       } else {
-        setIsScriptPubkeyValid(true);
+        setIsScriptPubkeyValid(false);
       }
     } else {
-      setIsScriptPubkeyValid(false);
+      setIsScriptPubkeyValid(null);
     }
   };
 
@@ -219,30 +219,6 @@ export default function ShowHandle({ route, navigation }: Props) {
     }
   };
 
-  const renderHandleName = (name: string) => {
-    const parts = name.split("@");
-    if (parts.length === 2) {
-      return (
-        <>
-          <Text style={styles.handleSubPart}>{parts[0]}</Text>
-          <Text style={styles.handleSpacePart}>@{parts[1]}</Text>
-        </>
-      );
-    }
-    return <Text style={styles.handleSpacePart}>{name}</Text>;
-  };
-
-  const isRemovable =
-    isScriptPubkeyValid === false ||
-    handleStatusString === "available" ||
-    handleStatusString === "preallocated" ||
-    handleStatusString === "invalid" ||
-    handleStatusString === "unknown";
-  const isProcessingPurchase =
-    isScriptPubkeyValid === true &&
-    (handleStatusString === "reserved" ||
-      handleStatusString === "processing_payment");
-
   return (
     <Layout
       overlay={showRemoveConfirm}
@@ -269,49 +245,76 @@ export default function ShowHandle({ route, navigation }: Props) {
           </View>
         ) : (
           <>
-            {handleData.cert && (
-              <Button
-                text="Sign Nostr Event"
-                onPress={() =>
-                  navigation.navigate("SignNostrEvent", { network, handle })
-                }
-                type="main"
-              />
-            )}
-            {handleData.cert ? (
-              <Button
-                text="Download Certificate"
-                onPress={handleDownloadCertificate}
-                type="secondary"
-              />
-            ) : handleStatusString === "unknown" ? (
-              <Button
-                text="Download Request"
-                onPress={handleDownloadRequest}
-                type="main"
-              />
-            ) : (
-              <>
-                <Button
-                  text={
-                    isProcessingPurchase
-                      ? "Processing..."
-                      : network === "testnet4"
-                        ? "Claim Handle"
-                        : "Buy Handle"
-                  }
-                  onPress={handleBuyHandle}
-                  type="main"
-                  disabled={isProcessingPurchase}
-                />
-                <Button
-                  text="Download Request"
-                  onPress={handleDownloadRequest}
-                  type="secondary"
-                />
-              </>
-            )}
-            {isRemovable && (
+            {(() => {
+              if (handleData.cert) {
+                return (
+                  <>
+                    <Button
+                      text="Sign Nostr Event"
+                      onPress={() =>
+                        navigation.navigate("SignNostrEvent", {
+                          network,
+                          handle,
+                        })
+                      }
+                      type="main"
+                    />
+                    <Button
+                      text="Download Certificate"
+                      onPress={handleDownloadCertificate}
+                      type="secondary"
+                    />
+                  </>
+                );
+              }
+
+              if (handleStatusString === "unknown") {
+                return (
+                  <Button
+                    text="Download Request"
+                    onPress={handleDownloadRequest}
+                    type="main"
+                  />
+                );
+              }
+
+              const isProcessingPurchase =
+                isScriptPubkeyValid === true &&
+                (handleStatusString === "reserved" ||
+                  handleStatusString === "processing_payment");
+
+              return (
+                <>
+                  {(isProcessingPurchase ||
+                    handleStatusString === "available") && (
+                    <Button
+                      text={
+                        isProcessingPurchase
+                          ? "Processing..."
+                          : network === "testnet4"
+                            ? "Claim Handle"
+                            : "Buy Handle"
+                      }
+                      onPress={handleBuyHandle}
+                      type="main"
+                      disabled={isProcessingPurchase}
+                    />
+                  )}
+                  {handleStatusString === "available" && (
+                    <Button
+                      text="Download Request"
+                      onPress={handleDownloadRequest}
+                      type="secondary"
+                    />
+                  )}
+                </>
+              );
+            })()}
+            {(isScriptPubkeyValid === false ||
+              handleStatusString === "available" ||
+              handleStatusString === "preallocated" ||
+              handleStatusString === "invalid" ||
+              handleStatusString === "unknown") && (
               <Button
                 text="Remove Handle"
                 onPress={() => setShowRemoveConfirm(true)}
@@ -322,27 +325,49 @@ export default function ShowHandle({ route, navigation }: Props) {
         )
       }
     >
-      <Text style={styles.title}>{renderHandleName(handle)}</Text>
+      <Text style={styles.title}>
+        {(() => {
+          const parts = handle.split("@");
+          if (parts.length === 2) {
+            return (
+              <>
+                <Text style={styles.handleSubPart}>{parts[0]}</Text>
+                <Text style={styles.handleSpacePart}>@{parts[1]}</Text>
+              </>
+            );
+          }
+          return <Text style={styles.handleSpacePart}>{handle}</Text>;
+        })()}
+      </Text>
 
-      {error ? (
-        <Message message={error} type="error" />
-      ) : isScriptPubkeyValid === false ? (
-        <Message
-          message={
+      {(() => {
+        if (error) {
+          return <Message message={error} type="error" />;
+        }
+
+        if (isScriptPubkeyValid === false) {
+          const message =
             handleStatusString === "taken"
               ? "Handle is taken, but it associated with a different public key."
-              : "Handle is currently reserved by another user."
-          }
-          type="error"
-        />
-      ) : handleStatusString === "taken" &&
-        isScriptPubkeyValid === true &&
-        handleData.cert === undefined ? (
-        <Message
-          message="Handle successfully claimed. Certificate is being generated."
-          type="success"
-        />
-      ) : null}
+              : "Handle is currently reserved by another user.";
+          return <Message message={message} type="error" />;
+        }
+
+        if (
+          handleStatusString === "taken" &&
+          isScriptPubkeyValid === true &&
+          handleData.cert === undefined
+        ) {
+          return (
+            <Message
+              message="Handle successfully claimed. Certificate is being generated."
+              type="success"
+            />
+          );
+        }
+
+        return null;
+      })()}
 
       <View style={styles.section}>
         <Text style={styles.label}>Public Key</Text>
