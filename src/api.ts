@@ -181,7 +181,7 @@ export async function claimHandleIAP(
   handle: string,
   script_pubkey: string,
   purchase_token: string,
-  payment_method: "google_iap" | "apple_iap",
+  payment_method: "google_iap" | "apple_iap" | "test",
 ): Promise<{
   handle_status: HandleStatus;
   error?: string;

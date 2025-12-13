@@ -114,7 +114,7 @@ export default function ShowHandle({ route, navigation }: Props) {
             handle,
             script_pubkey,
             `test_valid_purchase_${Date.now().toString()}${Math.random().toString(36).slice(1)}`,
-            "google_iap",
+            "test",
           );
           if (result.error) {
             setError(result.error);
@@ -164,53 +164,6 @@ export default function ShowHandle({ route, navigation }: Props) {
       setIsScriptPubkeyValid(false);
     }
   };
-
-  //   setIsProcessingPurchase(null);
-  //   setRemovableHandleCert(false);
-  //   switch (status.status) {
-  //     case "available":
-  //       setRemovableHandleCert(true);
-  //       setIsProcessingPurchase(false);
-  //       break;
-  //     case "unknown":
-  //       setRemovableHandleCert(true);
-  //       break;
-  //     case "invalid":
-  //       setRemovableHandleCert(true);
-  //       setError("Handle is invalid.");
-  //       break;
-  //     case "preallocated":
-  //       setRemovableHandleCert(true);
-  //       setError("Handle is preallocated.");
-  //       break;
-  //     case "reserved":
-  //       if (status.script_pubkey !== script_pubkey) {
-  //         setRemovableHandleCert(true);
-  //         setError("Handle is currently reserved.");
-  //       } else {
-  //         setIsProcessingPurchase(true);
-  //       }
-  //       break;
-  //     case "processing_payment":
-  //       setIsProcessingPurchase(true);
-  //       break;
-  //     case "taken":
-  //       if ("script_pubkey" in status) {
-  //         if (status.script_pubkey === script_pubkey) {
-  //           if ("certificate" in status) {
-  //             const certData = extractCertData(status.certificate);
-  //             await setHandleCertData(network, handle, certData);
-  //           }
-  //         } else {
-  //           setRemovableHandleCert(true);
-  //           setError(
-  //             "Handle certificate found but script_pubkey doesn't match. This handle may belong to a different key.",
-  //           );
-  //         }
-  //       }
-  //       break;
-  //   }
-  // };
 
   const handleRemoveHandle = () => {
     removeHandle(network, handle);
