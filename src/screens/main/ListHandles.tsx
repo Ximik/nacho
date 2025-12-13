@@ -34,6 +34,10 @@ export default function ListHandles({ route, navigation }: Props) {
   const [proposedHandles, setProposedHandles] = useState<string[]>([]);
 
   useEffect(() => {
+    setProposedHandles([]);
+  }, [network]);
+
+  useEffect(() => {
     const timeoutId = setTimeout(async () => {
       if (searchQuery) {
         const results = await fetchProposedHandles(network, searchQuery);

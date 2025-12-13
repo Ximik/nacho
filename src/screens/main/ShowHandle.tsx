@@ -128,8 +128,12 @@ export default function ShowHandle({ route, navigation }: Props) {
       } as Pick<ReturnType<IAPHook>, "requestPurchase" | "finishTransaction">);
 
   useEffect(() => {
+    setError(null);
+    setHandleStatusString("unknown");
+    setIsScriptPubkeyValid(null);
+    setShowRemoveConfirm(false);
     fetchAndUpdateHandleStatus();
-  }, []);
+  }, [handle, network]);
 
   useEffect(() => {
     if (
@@ -342,7 +346,7 @@ export default function ShowHandle({ route, navigation }: Props) {
 
       <View style={styles.section}>
         <Text style={styles.label}>Public Key</Text>
-        <Text style={styles.value} numberOfLines={6} breakStrategy="simple">
+        <Text style={styles.value} numberOfLines={6} textBreakStrategy="simple">
           {pubkey}
         </Text>
       </View>
@@ -350,7 +354,11 @@ export default function ShowHandle({ route, navigation }: Props) {
       {handleData.cert && (
         <View style={styles.section}>
           <Text style={styles.label}>Proof</Text>
-          <Text style={styles.value} numberOfLines={10} breakStrategy="simple">
+          <Text
+            style={styles.value}
+            numberOfLines={10}
+            textBreakStrategy="simple"
+          >
             {handleData.cert.witness.data}
           </Text>
         </View>
