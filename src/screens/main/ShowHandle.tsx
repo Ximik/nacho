@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -57,8 +58,9 @@ export default function ShowHandle({ route, navigation }: Props) {
   const { network, handle } = route.params;
   const { xpub, handles, removeHandle, setHandleCertData } = useStore();
   const [error, setError] = useState<string | null>(null);
-  const [handleStatusString, setHandleStatusString] =
-    useState<HandleStatus["status"]>("unknown");
+  const [handleStatusString, setHandleStatusString] = useState<
+    HandleStatus["status"] | null
+  >(null);
   const [isScriptPubkeyValid, setIsScriptPubkeyValid] = useState<
     boolean | null
   >(null);
@@ -126,6 +128,12 @@ export default function ShowHandle({ route, navigation }: Props) {
         },
         finishTransaction: async () => {},
       } as Pick<ReturnType<IAPHook>, "requestPurchase" | "finishTransaction">);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAndUpdateHandleStatus();
+    }, []),
+  );
 
   useEffect(() => {
     if (
@@ -210,7 +218,7 @@ export default function ShowHandle({ route, navigation }: Props) {
       fetchAndUpdateHandleStatus();
     }
   };
-
+  console.log(isScriptPubkeyValid, handleStatusString);
   return (
     <Layout
       overlay={showRemoveConfirm}
@@ -236,84 +244,86 @@ export default function ShowHandle({ route, navigation }: Props) {
             </View>
           </View>
         ) : (
-          <>
-            {(() => {
-              if (handleData.cert) {
-                return (
-                  <>
-                    <Button
-                      text="Sign Nostr Event"
-                      onPress={() =>
-                        navigation.navigate("SignNostrEvent", {
-                          network,
-                          handle,
-                        })
-                      }
-                      type="main"
-                    />
-                    <Button
-                      text="Download Certificate"
-                      onPress={handleDownloadCertificate}
-                      type="secondary"
-                    />
-                  </>
-                );
-              }
+          (handleStatusString !== null || handleData.cert) && (
+            <>
+              {(() => {
+                if (handleData.cert) {
+                  return (
+                    <>
+                      <Button
+                        text="Sign Nostr Event"
+                        onPress={() =>
+                          navigation.navigate("SignNostrEvent", {
+                            network,
+                            handle,
+                          })
+                        }
+                        type="main"
+                      />
+                      <Button
+                        text="Download Certificate"
+                        onPress={handleDownloadCertificate}
+                        type="secondary"
+                      />
+                    </>
+                  );
+                }
 
-              if (handleStatusString === "unknown") {
-                return (
-                  <Button
-                    text="Download Request"
-                    onPress={handleDownloadRequest}
-                    type="main"
-                  />
-                );
-              }
-
-              const isProcessingPurchase =
-                isScriptPubkeyValid === true &&
-                (handleStatusString === "reserved" ||
-                  handleStatusString === "processing_payment");
-
-              return (
-                <>
-                  {(isProcessingPurchase ||
-                    handleStatusString === "available") && (
-                    <Button
-                      text={
-                        isProcessingPurchase
-                          ? "Processing..."
-                          : network === "testnet4"
-                            ? "Claim Handle"
-                            : "Buy Handle"
-                      }
-                      onPress={handleBuyHandle}
-                      type="main"
-                      disabled={isProcessingPurchase}
-                    />
-                  )}
-                  {handleStatusString === "available" && (
+                if (handleStatusString === "unknown") {
+                  return (
                     <Button
                       text="Download Request"
                       onPress={handleDownloadRequest}
-                      type="secondary"
+                      type="main"
                     />
-                  )}
-                </>
-              );
-            })()}
-            {(isScriptPubkeyValid === false ||
-              handleStatusString === "available" ||
-              handleStatusString === "preallocated" ||
-              handleStatusString === "invalid" ||
-              handleStatusString === "unknown") && (
-              <Button
-                text="Remove Handle"
-                onPress={() => setShowRemoveConfirm(true)}
-                type="danger"
-              />
-            )}
-          </>
+                  );
+                }
+
+                const isProcessingPurchase =
+                  isScriptPubkeyValid === true &&
+                  (handleStatusString === "reserved" ||
+                    handleStatusString === "processing_payment");
+
+                return (
+                  <>
+                    {(isProcessingPurchase ||
+                      handleStatusString === "available") && (
+                      <Button
+                        text={
+                          isProcessingPurchase
+                            ? "Processing..."
+                            : network === "testnet4"
+                              ? "Claim Handle"
+                              : "Buy Handle"
+                        }
+                        onPress={handleBuyHandle}
+                        type="main"
+                        disabled={isProcessingPurchase}
+                      />
+                    )}
+                    {handleStatusString === "available" && (
+                      <Button
+                        text="Download Request"
+                        onPress={handleDownloadRequest}
+                        type="secondary"
+                      />
+                    )}
+                  </>
+                );
+              })()}
+              {(isScriptPubkeyValid === false ||
+                handleStatusString === "available" ||
+                handleStatusString === "preallocated" ||
+                handleStatusString === "invalid" ||
+                handleStatusString === "unknown") && (
+                <Button
+                  text="Remove Handle"
+                  onPress={() => setShowRemoveConfirm(true)}
+                  type="danger"
+                />
+              )}
+            </>
+          )
         )
       }
     >
