@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HandlesStackParamList } from "@/Navigation";
@@ -29,13 +29,7 @@ export default function ({ route, navigation }: Props) {
   const [handle, setHandle] = useState(initialHandle || "");
   const [error, setError] = useState<AddHandleError>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const currentOperationRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    currentOperationRef.current = null;
-    setError(null);
-    setIsLoading(false);
-  }, [network, initialHandle]);
   const { handles, createHandle } = useStore();
 
   const isValidSLabel = (label: string): boolean => {
@@ -91,13 +85,8 @@ export default function ({ route, navigation }: Props) {
       return;
     }
 
-    const operationKey = `${network}:${handle}`;
-    currentOperationRef.current = operationKey;
     setIsLoading(true);
     const { status } = await fetchHandleStatus(network, handle);
-    if (currentOperationRef.current !== operationKey) {
-      return;
-    }
 
     switch (status) {
       case "taken":
@@ -113,9 +102,7 @@ export default function ({ route, navigation }: Props) {
       await createHandle(network, handle);
       navigation.replace("ShowHandle", { network, handle });
     } catch (err) {
-      if (currentOperationRef.current === operationKey) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
       throw err;
     }
   };

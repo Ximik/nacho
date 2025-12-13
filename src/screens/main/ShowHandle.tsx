@@ -128,14 +128,6 @@ export default function ShowHandle({ route, navigation }: Props) {
       } as Pick<ReturnType<IAPHook>, "requestPurchase" | "finishTransaction">);
 
   useEffect(() => {
-    setError(null);
-    setHandleStatusString("unknown");
-    setIsScriptPubkeyValid(null);
-    setShowRemoveConfirm(false);
-    fetchAndUpdateHandleStatus();
-  }, [handle, network]);
-
-  useEffect(() => {
     if (
       handleStatusString === "reserved" ||
       handleStatusString === "processing_payment"

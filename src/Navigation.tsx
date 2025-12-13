@@ -117,6 +117,7 @@ function MainNavigator() {
           headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
         initialParams={{ network: "testnet4" }}
+        getId={({ params }) => params.network}
       />
       <HandlesStack.Screen
         name="ShowHandle"
@@ -125,6 +126,7 @@ function MainNavigator() {
           title: "Handles",
           headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
+        getId={({ params }) => `${params.network}-${params.handle}`}
       />
       <HandlesStack.Screen
         name="AddHandle"
@@ -133,6 +135,7 @@ function MainNavigator() {
           title: "Handles",
           headerRight: () => networkSwitcher(navigation, route.params.network),
         })}
+        getId={({ params }) => params.network}
       />
       <HandlesStack.Screen
         name="ImportCertificate"
