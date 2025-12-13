@@ -218,7 +218,7 @@ export default function ShowHandle({ route, navigation }: Props) {
       fetchAndUpdateHandleStatus();
     }
   };
-  console.log(isScriptPubkeyValid, handleStatusString);
+
   return (
     <Layout
       overlay={showRemoveConfirm}
