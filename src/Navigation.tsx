@@ -88,7 +88,15 @@ function MainNavigator() {
     const newNetwork: Network = network === "testnet4" ? "mainnet" : "testnet4";
     const displayName = network === "mainnet" ? "Mainnet" : "Testnet";
     return (
-      <TouchableOpacity onPress={() => {}} style={{ paddingRight: 16 }}>
+      <TouchableOpacity
+        onPress={() =>
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "ListHandles", params: { network: newNetwork } }],
+          })
+        }
+        style={{ paddingRight: 16 }}
+      >
         <Text style={{ color: "#FF7B00", fontSize: 16, fontWeight: "400" }}>
           {displayName}
         </Text>

@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.impervious.nacho",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -36,7 +36,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Nacho to access your camera",
+          "cameraPermission": "Camera access is required to scan QR codes",
           "recordAudioAndroid": false
         }
       ],
